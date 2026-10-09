@@ -1,0 +1,4 @@
+# Computador (Windows/Linux) e Raspberry Pi OS 64-bit.
+ultralytics>=8.4.0
+ncnn
+opencv-python>=4.10.0

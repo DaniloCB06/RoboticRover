@@ -71,6 +71,10 @@ RoboticRover/
 │   ├── ver_teste_visual.ps1    # comparação visual do conjunto de teste
 │   ├── requirements-train.txt
 │   └── requirements-pi.txt
+├── modelo_na_camera/            # aplicação de detecção em tempo real
+│   ├── main.py
+│   ├── run_windows.ps1
+│   └── run_pi.sh
 ├── Fotos_pecas/                # imagens originais; não versionadas
 └── README.md
 ```
@@ -102,6 +106,20 @@ Set-ExecutionPolicy -Scope Process Bypass
 ## Usar um modelo `.pt` já pronto
 
 Não há uma etapa especial de “importação”: mantenha o arquivo `.pt` em qualquer pasta acessível e passe seu caminho com `--weights`. Se preferir copiá-lo para dentro do projeto, use `modelo_visao_computacional/models/`; essa pasta é ignorada pelo Git.
+
+Por exemplo, para manter um modelo pronto destinado ao **teste visual** neste repositório, copie-o para:
+
+```text
+modelo_visao_computacional/models/best.pt
+```
+
+Depois execute, a partir da raiz `RoboticRover`:
+
+```powershell
+.\modelo_visao_computacional\ver_teste_visual.ps1 --weights ".\modelo_visao_computacional\models\best.pt"
+```
+
+O modelo não será enviado ao Git, mas as 33 imagens de teste continuam necessárias em `modelo_visao_computacional/data/yolo/images/test`.
 
 Para fazer apenas o teste visual das imagens de teste com um modelo recebido pronto, a partir da raiz `RoboticRover`:
 
@@ -204,6 +222,38 @@ python scripts/export_ncnn.py --weights "C:\caminho\para\modelo.pt" --imgsz 320
 ```
 
 O comando cria uma pasta com sufixo `_ncnn_model` ao lado do arquivo de pesos. Ela também é ignorada pelo Git; copie a pasta inteira para o Raspberry Pi, por exemplo para `~/rover/models/best_ncnn_model`. Para testar no PC, use o `.pt`; a pasta NCNN é a versão destinada à execução no Pi.
+
+## Detector em tempo real pela câmera
+
+A aplicação recomendada para testar e usar a classificação ao vivo está em [`modelo_na_camera`](modelo_na_camera/README.md). Ela desenha as caixas, classes e confiança sobre a webcam, limita a taxa de inferência e pode emitir as detecções confirmadas em JSON.
+
+No Windows, a partir da raiz do repositório, teste o modelo `.pt`:
+
+```powershell
+.\modelo_na_camera\run_windows.ps1 --model ".\modelo_visao_computacional\runs\train\pecas_6classes_320\weights\best.pt"
+```
+
+Esse primeiro caminho existe somente depois de treinar localmente. Para usar um `.pt` já pronto sem retreinar, copie-o para `modelo_na_camera/models/best.pt` (pasta ignorada pelo Git) e use:
+
+```powershell
+.\modelo_na_camera\run_windows.ps1 --model ".\modelo_na_camera\models\best.pt"
+```
+
+Também é válido manter o `.pt` fora do repositório e passar seu caminho absoluto ao `--model`.
+
+Para identificar o índice correto de uma webcam USB ou DroidCam, execute antes:
+
+```powershell
+.\modelo_na_camera\listar_cameras.ps1
+```
+
+No Raspberry Pi, após copiar a pasta NCNN exportada, execute:
+
+```bash
+./run_pi.sh --model /home/pi/rover/models/best_ncnn_model --fps 8
+```
+
+Consulte o README desse diretório para instalação, uso sem monitor, saída JSON e opções de câmera.
 
 ## Executar na webcam do Raspberry Pi
 

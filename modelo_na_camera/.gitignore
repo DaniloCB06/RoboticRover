@@ -1,0 +1,7 @@
+.venv/
+models/
+output/
+*.pt
+*.onnx
+__pycache__/
+*.py[cod]
