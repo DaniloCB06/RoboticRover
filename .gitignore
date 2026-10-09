@@ -1,0 +1,11 @@
+Fotos_pecas/
+Robot Piece Picking.v1-fotos_pecas_boundboxes.yolov8.zip
+runs/
+modelo_visao_computacional/.venv/
+modelo_visao_computacional/data/
+modelo_visao_computacional/runs/
+modelo_visao_computacional/models/
+modelo_visao_computacional/*.pt
+modelo_visao_computacional/**/*.log
+**/__pycache__/
+.venv/

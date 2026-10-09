@@ -1,0 +1,5 @@
+# Raspberry Pi 5, Raspberry Pi OS 64-bit. Instale depois de exportar o modelo.
+ultralytics>=8.4.0
+ncnn
+opencv-python-headless>=4.10.0
+

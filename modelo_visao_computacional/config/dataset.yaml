@@ -1,0 +1,14 @@
+# Este arquivo descreve o dataset YOLO gerado por scripts/split_dataset.py.
+# Os caminhos são relativos a este arquivo.
+path: ../data/yolo
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: argola_grande
+  1: argola_pequena
+  2: cilindro_com_base
+  3: dado_hexagonal
+  4: helice
+  5: paraboloide_hiperbolico

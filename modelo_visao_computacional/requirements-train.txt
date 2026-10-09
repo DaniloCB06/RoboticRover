@@ -1,0 +1,6 @@
+# Instale em um computador de treinamento (preferencialmente com GPU).
+ultralytics>=8.4.0
+opencv-python>=4.10.0
+# Necessárias para exportar pesos .pt para o formato NCNN do Raspberry Pi.
+ncnn
+pnnx
