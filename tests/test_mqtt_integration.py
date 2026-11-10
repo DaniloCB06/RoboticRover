@@ -254,3 +254,34 @@ def test_graceful_shutdown(wire):
         transport.stop()
     result = wire.wait("rover/status", lambda p: p["source"] == client_id and not p["data"]["online"])
     assert result["data"]["reason"] == "graceful_shutdown"
+
+
+def test_dashboard_http_and_websocket(wire, simulator):
+    with urlopen(NODE_RED_URL + "/dashboard", timeout=5) as resp:
+        html = resp.read().decode("utf-8")
+        assert resp.status == 200
+        assert "RoboticRover" in html and "WebRTC (WHEP)" in html
+
+    ws_url = NODE_RED_URL.replace("http://", "ws://").replace("https://", "wss://") + "/ws/rover"
+    with closing(websocket.create_connection(ws_url, timeout=3, http_no_proxy=["127.0.0.1", "localhost"])) as ws:
+        _, client_id = simulator()
+        deadline = time.monotonic() + 6
+        seen_types = set()
+        while "telemetry" not in seen_types and time.monotonic() < deadline:
+            try:
+                msg = json.loads(ws.recv())
+                if msg.get("source") == client_id:
+                    seen_types.add(msg.get("type"))
+            except websocket.WebSocketTimeoutException:
+                continue
+        assert "telemetry" in seen_types
+
+        after = len(wire.records)
+        ws.send(json.dumps({"kind": "mode", "mode": "BUSCA"}))
+        ack = wire.wait("rover/cmd/ack", lambda p: p["source"] == client_id, after)
+        assert ack["data"]["accepted"] is True and ack["data"]["state"] == "BUSCA"
+
+    with urlopen(NODE_RED_URL + "/api/rover/snapshot", timeout=5) as resp:
+        snap = json.loads(resp.read().decode("utf-8"))
+        assert snap["simulated"] is True
+        assert snap["telemetry"] is not None

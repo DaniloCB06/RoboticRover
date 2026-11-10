@@ -5,22 +5,34 @@ const fs = require("fs");
 const source = process.env.ROVER_FLOW_FILE || "/opt/rover/flows.json";
 const target = process.env.NODE_RED_FLOW_FILE || "/data/flows.json";
 
-function isStockDockerFlow(file) {
+function isStockOrOutdatedRoverFlow(file) {
     try {
         const nodes = JSON.parse(fs.readFileSync(file, "utf8"));
-        return nodes.length === 2 &&
+        if (!Array.isArray(nodes)) return false;
+        const isStock = nodes.length === 2 &&
             nodes.some((node) => node.type === "tab" && node.label === "Flow 1") &&
             nodes.some((node) => node.type === "comment" &&
                 node.name.startsWith("WARNING: please check you have started this container"));
+        const isOutdatedRover = nodes.some((node) => node.id === "rover-tab") &&
+            !nodes.some((node) => node.id === "dashboard-http-in");
+        return isStock || isOutdatedRover;
     } catch (_) {
         // Arquivos existentes inválidos são preservados para diagnóstico.
         return false;
     }
 }
 
-if (!fs.existsSync(target) || isStockDockerFlow(target)) {
-    fs.copyFileSync(source, target);
-    console.log("Fluxo RoboticRover inicializado em " + target);
+if (!fs.existsSync(target) || isStockOrOutdatedRoverFlow(target)) {
+    const nodes = JSON.parse(fs.readFileSync(source, "utf8"));
+    for (const node of nodes) {
+        if (node.id === "broker") {
+            node.broker = "${MQTT_HOST}";
+            node.port = "${MQTT_PORT}";
+            node.clientid = "${STATION_CLIENT_ID}";
+        }
+    }
+    fs.writeFileSync(target, JSON.stringify(nodes, null, 2) + "\n", "utf8");
+    console.log("Fluxo RoboticRover inicializado/atualizado em " + target);
 } else {
     console.log("Fluxo existente preservado em " + target);
 }

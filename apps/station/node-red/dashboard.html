@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoboticRover • Dashboard da Estação-Base</title>
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --bg-panel: #111827;
+      --bg-card: #172033;
+      --bg-card-hover: #1e293b;
+      --border: #26334d;
+      --border-highlight: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #38bdf8;
+      --accent-strong: #0284c7;
+      --ok: #10b981;
+      --ok-bg: rgba(16, 185, 129, 0.14);
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.14);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.16);
+      --radius: 10px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #131c31 0%, var(--bg-base) 70%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+
+    /* Top Bar */
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 20px;
+      background: rgba(17, 24, 39, 0.92);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      letter-spacing: -0.5px;
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.35);
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-sub {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      border: 1px solid transparent;
+    }
+
+    .badge-sim {
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--accent);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .badge-ok {
+      background: var(--ok-bg);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+
+    .badge-warn {
+      background: var(--warn-bg);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .badge-danger {
+      background: var(--danger-bg);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      display: inline-block;
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-emergency {
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      color: #fff;
+      border: 1px solid #f87171;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.4);
+      transition: transform 0.1s ease, box-shadow 0.15s ease;
+    }
+
+    .btn-emergency:hover {
+      box-shadow: 0 0 24px rgba(239, 68, 68, 0.7);
+      transform: translateY(-1px);
+    }
+
+    .btn-emergency:active {
+      transform: translateY(0);
+    }
+
+    /* Main Grid */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 16px 20px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .section-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    /* Telemetry Row */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.45fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 1200px) {
+      .telemetry-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .telemetry-grid > :last-child {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .telemetry-grid {
+        grid-template-columns: 1fr;
+      }
+      .telemetry-grid > :last-child {
+        grid-column: span 1;
+      }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-label {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .metric-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .metric-value {
+      font-size: 2.15rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      letter-spacing: -1px;
+    }
+
+    .metric-unit {
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: #0b111e;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      border-radius: 999px;
+      transition: width 0.25s ease, background 0.25s ease;
+    }
+
+    .sparkline-box {
+      background: #0b111e;
+      border: 1px solid rgba(38, 51, 77, 0.7);
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+
+    .sparkline-canvas {
+      width: 100%;
+      height: 64px;
+      display: block;
+    }
+
+    .metric-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    /* Proximity Radar & Bars */
+    .proximity-layout {
+      display: grid;
+      grid-template-columns: 185px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    @media (max-width: 560px) {
+      .proximity-layout {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+    }
+
+    .radar-wrap {
+      background: #0b111e;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .prox-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .prox-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .prox-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+
+    .prox-val {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.96rem;
+    }
+
+    /* Middle Row: Camera + Controls */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Camera Viewport */
+    .cam-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tab-group {
+      display: inline-flex;
+      background: #0b111e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 6px 11px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card-hover);
+      color: var(--accent);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .cam-config-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+
+    .cam-input {
+      flex: 1;
+      min-width: 210px;
+      background: #0b111e;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .btn {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent-strong);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #0369a1;
+      color: #fff;
+    }
+
+    .cam-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #05080f;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .cam-stage video,
+    .cam-stage img,
+    .cam-stage iframe,
+    .cam-stage canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #camHudCanvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .cam-info-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    .cam-info-note code {
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    /* State Machine & Manual Controls */
+    .state-banner {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .state-current {
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .state-meta {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .mode-pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    @media (max-width: 680px) {
+      .mode-pipeline {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .mode-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 8px;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .mode-btn .step-tag {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .mode-btn.active-state {
+      border-color: var(--ok);
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .mode-btn.next-valid {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .mode-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+    }
+
+    /* Manual D-Pad */
+    .manual-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    @media (max-width: 560px) {
+      .manual-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 64px);
+      grid-template-rows: repeat(3, 52px);
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .dpad-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      user-select: none;
+      transition: all 0.1s ease;
+    }
+
+    .dpad-btn kbd {
+      font-size: 0.62rem;
+      color: var(--text-dim);
+    }
+
+    .dpad-btn:hover {
+      border-color: var(--accent);
+      background: var(--bg-card-hover);
+    }
+
+    .dpad-btn:active,
+    .dpad-btn.pressed {
+      background: var(--accent-strong);
+      border-color: var(--accent);
+      transform: scale(0.96);
+    }
+
+    .dpad-stop {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+
+    .manual-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.78rem;
+    }
+
+    .ack-box {
+      background: #0b111e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Bottom Feed */
+    .feed-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 960px) {
+      .feed-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .event-list {
+      background: #0b111e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 190px;
+      overflow-y: auto;
+      padding: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .event-item {
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(23, 32, 51, 0.7);
+      border-left: 3px solid var(--accent);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .event-item.warn {
+      border-left-color: var(--warn);
+    }
+
+    .event-item.error {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .event-time {
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">RR</div>
+      <div>
+        <div class="brand-title">
+          RoboticRover • Centro de Operações
+          <span class="badge badge-sim" id="simBadge">SIMULAÇÃO v1.0</span>
+        </div>
+        <div class="brand-sub">Estação-Base Node-RED • Telemetria MQTT, Controle Operacional e Vídeo Híbrido</div>
+      </div>
+    </div>
+
+    <div class="status-strip">
+      <span class="badge badge-warn" id="wsBadge">
+        <span class="dot"></span>
+        <span id="wsText">WS: Conectando...</span>
+      </span>
+      <span class="badge badge-danger" id="roverOnlineBadge">
+        <span class="dot"></span>
+        <span id="roverOnlineText">ROVER: Aguardando</span>
+      </span>
+      <span class="badge badge-sim" id="lastSeenBadge">Último pacote: --</span>
+      <button class="btn-emergency" id="btnEmergencyTop" type="button" title="Atalho: Barra de Espaço ou Esc">
+        PARADA DE EMERGÊNCIA (ESPAÇO)
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- TELEMETRY SECTION -->
+    <section>
+      <div class="section-title">
+        <span>Telemetria em Tempo Real (`rover/telemetria`)</span>
+        <span id="telemetrySourceLabel" style="font-family: var(--font-mono); font-size: 0.74rem;">origem: --</span>
+      </div>
+
+      <div class="telemetry-grid">
+        <!-- BATERIA -->
+        <div class="panel">
+          <div class="metric-header">
+            <span class="metric-label">CARGA DA BATERIA</span>
+            <span class="badge badge-ok" id="batteryBadge">NOMINAL</span>
+          </div>
+          <div class="metric-main">
+            <div>
+              <span class="metric-value" id="batteryValue">--.-</span>
+              <span class="metric-unit">%</span>
+            </div>
+            <div style="text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);">
+              <div id="batteryVoltageEst">~ --.- V (LiPo 3S sim)</div>
+              <div id="batteryRateLabel">Taxa: -0.002 %/amostra</div>
+            </div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="batteryBar"></div>
+          </div>
+          <div class="sparkline-box">
+            <canvas class="sparkline-canvas" id="batterySparkline" width="360" height="64"></canvas>
+          </div>
+          <div class="metric-stats">
+            <span id="batteryMin">Mín: --%</span>
+            <span id="batteryMax">Máx: --%</span>
+            <span id="batterySamples">Amostras: 0</span>
+          </div>
+        </div>
+
+        <!-- TEMPERATURA -->
+        <div class="panel">
+          <div class="metric-header">
+            <span class="metric-label">TEMPERATURA INTERNA</span>
+            <span class="badge badge-ok" id="tempBadge">NORMAL</span>
+          </div>
+          <div class="metric-main">
+            <div>
+              <span class="metric-value" id="tempValue">--.-</span>
+              <span class="metric-unit">°C</span>
+            </div>
+            <div style="text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);">
+              <div>Faixa operacional: 35–48 °C</div>
+              <div id="tempTrendLabel">Tendência: estável</div>
+            </div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="tempBar"></div>
+          </div>
+          <div class="sparkline-box">
+            <canvas class="sparkline-canvas" id="tempSparkline" width="360" height="64"></canvas>
+          </div>
+          <div class="metric-stats">
+            <span id="tempMin">Mín: -- °C</span>
+            <span id="tempAvg">Méd: -- °C</span>
+            <span id="tempMax">Máx: -- °C</span>
+          </div>
+        </div>
+
+        <!-- SENSORES DE PROXIMIDADE -->
+        <div class="panel">
+          <div class="metric-header">
+            <span class="metric-label">SENSORES DE PROXIMIDADE (FRENTE / ESQUERDA / DIREITA)</span>
+            <span class="badge badge-ok" id="proxGlobalBadge">CAMINHO LIVRE</span>
+          </div>
+
+          <div class="proximity-layout">
+            <div class="radar-wrap">
+              <canvas id="radarCanvas" width="170" height="150"></canvas>
+              <span style="font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); margin-top: 2px;">
+                RADAR 2D (0–200 cm)
+              </span>
+            </div>
+
+            <div class="prox-bars">
+              <div class="prox-item">
+                <div class="prox-row">
+                  <span>▲ Frente (`front`)</span>
+                  <span class="prox-val" id="proxFrontVal">--.- cm</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" id="proxFrontBar"></div>
+                </div>
+              </div>
+
+              <div class="prox-item">
+                <div class="prox-row">
+                  <span>◀ Esquerda (`left`)</span>
+                  <span class="prox-val" id="proxLeftVal">--.- cm</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" id="proxLeftBar"></div>
+                </div>
+              </div>
+
+              <div class="prox-item">
+                <div class="prox-row">
+                  <span>▶ Direita (`right`)</span>
+                  <span class="prox-val" id="proxRightVal">--.- cm</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" id="proxRightBar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CAMERA + CONTROLS -->
+    <section class="workspace-grid">
+      <!-- HYBRID CAMERA PANEL -->
+      <div class="panel">
+        <div class="cam-toolbar">
+          <div class="metric-label">CÂMERA DO ROVER (WEBRTC / MJPEG / SIMULADOR HUD)</div>
+          <div class="tab-group" role="tablist">
+            <button class="tab-btn active" data-cam-mode="sim" type="button">Simulador HUD</button>
+            <button class="tab-btn" data-cam-mode="webrtc" type="button">WebRTC (WHEP)</button>
+            <button class="tab-btn" data-cam-mode="iframe" type="button">WebRTC (Player/Iframe)</button>
+            <button class="tab-btn" data-cam-mode="mjpeg" type="button">MJPEG HTTP</button>
+          </div>
+        </div>
+
+        <div class="cam-config-bar" id="camConfigBar" style="display: none;">
+          <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600;" id="camUrlLabel">Endpoint:</span>
+          <input class="cam-input" id="camUrlInput" type="text" placeholder="http://192.168.1.50:8889/rover/whep" />
+          <button class="btn btn-primary" id="btnCamConnect" type="button">Conectar</button>
+          <button class="btn" id="btnCamDisconnect" type="button">Parar</button>
+          <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;">
+            <input type="checkbox" id="chkHudOverlay" checked /> HUD
+          </label>
+        </div>
+
+        <div class="cam-stage">
+          <video id="camVideo" autoplay playsinline muted style="display: none;"></video>
+          <img id="camMjpeg" alt="Stream MJPEG do Rover" style="display: none;" />
+          <iframe id="camIframe" title="Player WebRTC Embarcado" style="display: none; border: none;" allow="autoplay; fullscreen"></iframe>
+          <canvas id="camHudCanvas" width="768" height="432"></canvas>
+        </div>
+
+        <div class="cam-info-note">
+          <strong>Protocolos de Câmera na Raspberry Pi 3:</strong>
+          Você provavelmente estava lembrando de <code>WebRTC</code> (via <strong>MediaMTX</strong>, <strong>go2rtc</strong> ou <strong>uStreamer WebRTC</strong> usando WHEP na porta <code>8889</code>) ou de <code>MJPEG sobre HTTP</code> (via <strong>uStreamer</strong> / <strong>mjpg-streamer</strong> na porta <code>8080</code>). Enquanto a câmera física não está conectada, o modo <strong>Simulador HUD</strong> renderiza a visão sintética sincronizada com os sensores e o estado atual do Rover.
+        </div>
+      </div>
+
+      <!-- STATE MACHINE & MANUAL CONTROLS -->
+      <div class="panel">
+        <div class="section-title" style="margin-bottom: 0;">
+          <span>Máquina de Estados &amp; Navegação (`rover/estado`, `rover/cmd/*`)</span>
+          <span class="badge badge-sim" id="motionBadge">MOVIMENTO: PARAR</span>
+        </div>
+
+        <div class="state-banner">
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">ESTADO OPERACIONAL ATUAL</div>
+            <div class="state-current" id="currentStateText">SEGURO_ESPERA</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="state-meta" id="prevStateText">anterior: --</div>
+            <div class="state-meta" id="stateReasonText">motivo: inicializando</div>
+          </div>
+        </div>
+
+        <div style="font-size: 0.76rem; color: var(--text-muted);">
+          Clique para comandar mudança de modo (o botão destacado em azul é o próximo passo válido da sequência):
+        </div>
+
+        <div class="mode-pipeline">
+          <button class="mode-btn active-state" data-mode="SEGURO_ESPERA" type="button">
+            <span class="step-tag">0 • SEGURO</span>
+            <span>SEGURO_ESPERA</span>
+          </button>
+          <button class="mode-btn next-valid" data-mode="BUSCA" type="button">
+            <span class="step-tag">1 • INÍCIO</span>
+            <span>BUSCA</span>
+          </button>
+          <button class="mode-btn" data-mode="APROXIMACAO" type="button">
+            <span class="step-tag">2 • ALVO</span>
+            <span>APROXIMACAO</span>
+          </button>
+          <button class="mode-btn" data-mode="AGUARDANDO_PEGA" type="button">
+            <span class="step-tag">3 • POSIÇÃO</span>
+            <span>AGUARDANDO_PEGA</span>
+          </button>
+          <button class="mode-btn" data-mode="CAPTURA_MANUAL" type="button">
+            <span class="step-tag">4 • OPERADOR</span>
+            <span>CAPTURA_MANUAL</span>
+          </button>
+        </div>
+
+        <div class="manual-grid">
+          <div class="dpad">
+            <div></div>
+            <button class="dpad-btn" data-action="AVANCAR" type="button">
+              <span>▲ AVANÇAR</span>
+              <kbd>W / ↑</kbd>
+            </button>
+            <div></div>
+
+            <button class="dpad-btn" data-action="ESQUERDA" type="button">
+              <span>◀ ESQ</span>
+              <kbd>A / ←</kbd>
+            </button>
+            <button class="dpad-btn dpad-stop" data-action="PARAR" type="button">
+              <span>■ PARAR</span>
+              <kbd>ESPAÇO</kbd>
+            </button>
+            <button class="dpad-btn" data-action="DIREITA" type="button">
+              <span>DIR ▶</span>
+              <kbd>D / →</kbd>
+            </button>
+
+            <div></div>
+            <button class="dpad-btn" data-action="RECUAR" type="button">
+              <span>▼ RECUAR</span>
+              <kbd>S / ↓</kbd>
+            </button>
+            <div></div>
+          </div>
+
+          <div class="manual-options">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Duração do pulso manual:</span>
+              <strong style="font-family: var(--font-mono); color: var(--accent);" id="durationLabel">500 ms</strong>
+            </div>
+            <input type="range" id="durationSlider" min="100" max="1000" step="50" value="500" />
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="chkKeyboard" checked />
+              Atalhos de teclado (WASD / Setas / Espaço)
+            </label>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">
+              Movimentos exigem <code>CAPTURA_MANUAL</code> e expiram localmente no Rover se não renovados. <code>PARAR</code> funciona em qualquer modo.
+            </div>
+          </div>
+        </div>
+
+        <div class="ack-box" id="ackBox">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted);">ÚLTIMO ACK (`rover/cmd/ack`)</span>
+            <span class="badge badge-sim" id="ackStatusBadge">AGUARDANDO COMANDO</span>
+          </div>
+          <div id="ackDetails" style="color: var(--text-main);">Nenhum comando enviado nesta sessão.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALARMS & LOGS -->
+    <section class="feed-grid">
+      <div class="panel">
+        <div class="section-title" style="margin-bottom: 0;">
+          <span>Alarmes e Confirmações (`rover/alarme`, `rover/cmd/ack`)</span>
+          <button class="btn" id="btnClearAlarms" type="button" style="padding: 2px 8px; font-size: 0.7rem;">Limpar</button>
+        </div>
+        <div class="event-list" id="alarmList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title" style="margin-bottom: 0;">
+          <span>Logs Operacionais (`rover/log`)</span>
+          <button class="btn" id="btnClearLogs" type="button" style="padding: 2px 8px; font-size: 0.7rem;">Limpar</button>
+        </div>
+        <div class="event-list" id="logList"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const VALID_NEXT = {
+        SEGURO_ESPERA: ["BUSCA"],
+        BUSCA: ["APROXIMACAO"],
+        APROXIMACAO: ["AGUARDANDO_PEGA"],
+        AGUARDANDO_PEGA: ["CAPTURA_MANUAL"],
+        CAPTURA_MANUAL: ["BUSCA"]
+      };
+
+      const state = {
+        wsConnected: false,
+        roverOnline: false,
+        roverReason: "aguardando",
+        source: "--",
+        lastPacketMs: null,
+        currentState: "SEGURO_ESPERA",
+        previousState: "SEGURO_ESPERA",
+        stateReason: "inicializando",
+        motion: "PARAR",
+        telemetry: {
+          battery_percent: null,
+          temperature_c: null,
+          proximity_cm: { front: null, left: null, right: null }
+        },
+        history: {
+          battery: [],
+          temperature: []
+        },
+        camMode: "sim",
+        webrtcPc: null,
+        simTick: 0
+      };
+
+      // DOM elements
+      const wsBadge = document.getElementById("wsBadge");
+      const wsText = document.getElementById("wsText");
+      const roverOnlineBadge = document.getElementById("roverOnlineBadge");
+      const roverOnlineText = document.getElementById("roverOnlineText");
+      const lastSeenBadge = document.getElementById("lastSeenBadge");
+      const telemetrySourceLabel = document.getElementById("telemetrySourceLabel");
+
+      const batteryValue = document.getElementById("batteryValue");
+      const batteryBadge = document.getElementById("batteryBadge");
+      const batteryVoltageEst = document.getElementById("batteryVoltageEst");
+      const batteryBar = document.getElementById("batteryBar");
+      const batteryMin = document.getElementById("batteryMin");
+      const batteryMax = document.getElementById("batteryMax");
+      const batterySamples = document.getElementById("batterySamples");
+      const batterySparkline = document.getElementById("batterySparkline");
+
+      const tempValue = document.getElementById("tempValue");
+      const tempBadge = document.getElementById("tempBadge");
+      const tempTrendLabel = document.getElementById("tempTrendLabel");
+      const tempBar = document.getElementById("tempBar");
+      const tempMin = document.getElementById("tempMin");
+      const tempAvg = document.getElementById("tempAvg");
+      const tempMax = document.getElementById("tempMax");
+      const tempSparkline = document.getElementById("tempSparkline");
+
+      const proxGlobalBadge = document.getElementById("proxGlobalBadge");
+      const proxFrontVal = document.getElementById("proxFrontVal");
+      const proxLeftVal = document.getElementById("proxLeftVal");
+      const proxRightVal = document.getElementById("proxRightVal");
+      const proxFrontBar = document.getElementById("proxFrontBar");
+      const proxLeftBar = document.getElementById("proxLeftBar");
+      const proxRightBar = document.getElementById("proxRightBar");
+      const radarCanvas = document.getElementById("radarCanvas");
+
+      const currentStateText = document.getElementById("currentStateText");
+      const prevStateText = document.getElementById("prevStateText");
+      const stateReasonText = document.getElementById("stateReasonText");
+      const motionBadge = document.getElementById("motionBadge");
+      const ackStatusBadge = document.getElementById("ackStatusBadge");
+      const ackDetails = document.getElementById("ackDetails");
+
+      const alarmList = document.getElementById("alarmList");
+      const logList = document.getElementById("logList");
+
+      const durationSlider = document.getElementById("durationSlider");
+      const durationLabel = document.getElementById("durationLabel");
+      const chkKeyboard = document.getElementById("chkKeyboard");
+
+      const camConfigBar = document.getElementById("camConfigBar");
+      const camUrlLabel = document.getElementById("camUrlLabel");
+      const camUrlInput = document.getElementById("camUrlInput");
+      const camVideo = document.getElementById("camVideo");
+      const camMjpeg = document.getElementById("camMjpeg");
+      const camIframe = document.getElementById("camIframe");
+      const camHudCanvas = document.getElementById("camHudCanvas");
+      const chkHudOverlay = document.getElementById("chkHudOverlay");
+
+      function formatTime(iso) {
+        if (!iso) return new Date().toLocaleTimeString("pt-BR");
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleTimeString("pt-BR");
+      }
+
+      function pushEvent(container, text, level, isoTime) {
+        const div = document.createElement("div");
+        div.className = "event-item" + (level === "warn" ? " warn" : level === "error" ? " error" : "");
+        const msgSpan = document.createElement("span");
+        msgSpan.textContent = text;
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "event-time";
+        timeSpan.textContent = formatTime(isoTime);
+        div.appendChild(msgSpan);
+        div.appendChild(timeSpan);
+        container.prepend(div);
+        while (container.children.length > 40) {
+          container.removeChild(container.lastChild);
+        }
+      }
+
+      function drawSparkline(canvas, values, strokeColor, fillColor, minRef, maxRef) {
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        // Grid lines
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+        ctx.lineWidth = 1;
+        for (let i = 1; i <= 2; i++) {
+          const y = (h / 3) * i;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+
+        if (!values || values.length === 0) return;
+
+        const minVal = minRef !== undefined ? Math.min(minRef, ...values) : Math.min(...values) - 0.5;
+        const maxVal = maxRef !== undefined ? Math.max(maxRef, ...values) : Math.max(...values) + 0.5;
+        const span = Math.max(0.01, maxVal - minVal);
+
+        const pts = values.map((v, idx) => {
+          const x = values.length === 1 ? w / 2 : (idx / (values.length - 1)) * (w - 8) + 4;
+          const y = h - 6 - ((v - minVal) / span) * (h - 12);
+          return [x, y];
+        });
+
+        ctx.beginPath();
+        pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.lineTo(pts[pts.length - 1][0], h);
+        ctx.lineTo(pts[0][0], h);
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+
+      function proxColor(cm) {
+        if (!Number.isFinite(cm)) return "#38bdf8";
+        if (cm < 50) return "#ef4444";
+        if (cm < 100) return "#f59e0b";
+        return "#10b981";
+      }
+
+      function drawRadar() {
+        const ctx = radarCanvas.getContext("2d");
+        const w = radarCanvas.width;
+        const h = radarCanvas.height;
+        const cx = w / 2;
+        const cy = h - 24;
+        const maxR = 110;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Concentric range arcs (50, 100, 150, 200 cm)
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.18)";
+        ctx.lineWidth = 1;
+        [0.25, 0.5, 0.75, 1.0].forEach((ratio) => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, maxR * ratio, Math.PI, 0, false);
+          ctx.stroke();
+        });
+
+        // Crosshairs
+        ctx.beginPath();
+        ctx.moveTo(cx - maxR, cy);
+        ctx.lineTo(cx + maxR, cy);
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx, cy - maxR);
+        ctx.stroke();
+
+        const p = state.telemetry.proximity_cm || {};
+        const sectors = [
+          { val: p.front, start: -Math.PI * 0.65, end: -Math.PI * 0.35 },
+          { val: p.left, start: -Math.PI * 0.98, end: -Math.PI * 0.72 },
+          { val: p.right, start: -Math.PI * 0.28, end: -Math.PI * 0.02 }
+        ];
+
+        sectors.forEach((s) => {
+          if (!Number.isFinite(s.val)) return;
+          const clamped = Math.max(10, Math.min(200, s.val));
+          const r = (clamped / 200) * maxR;
+          const color = proxColor(s.val);
+
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, r, s.start, s.end, false);
+          ctx.closePath();
+          ctx.fillStyle = color + "28";
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, s.start, s.end, false);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3.5;
+          ctx.stroke();
+        });
+
+        // Rover body
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(cx - 8, cy - 10, 16, 20);
+        ctx.strokeStyle = "#0284c7";
+        ctx.strokeRect(cx - 8, cy - 10, 16, 20);
+      }
+
+      function updateTelemetryUI(envelope) {
+        const d = envelope.data || {};
+        state.source = envelope.source || state.source;
+        telemetrySourceLabel.textContent = "origem: " + state.source + " • " + formatTime(envelope.timestamp);
+
+        const bat = Number(d.battery_percent);
+        const temp = Number(d.temperature_c);
+        const prox = d.proximity_cm || {};
+
+        if (Number.isFinite(bat)) {
+          state.telemetry.battery_percent = bat;
+          state.history.battery.push(bat);
+          if (state.history.battery.length > 60) state.history.battery.shift();
+
+          batteryValue.textContent = bat.toFixed(2);
+          const voltage = 9.6 + (bat / 100) * 3.0;
+          batteryVoltageEst.textContent = "~ " + voltage.toFixed(2) + " V (LiPo 3S sim)";
+          batteryBar.style.width = Math.max(0, Math.min(100, bat)) + "%";
+
+          if (bat < 20) {
+            batteryBadge.className = "badge badge-danger";
+            batteryBadge.textContent = "CRÍTICA";
+            batteryBar.style.background = "#ef4444";
+          } else if (bat < 50) {
+            batteryBadge.className = "badge badge-warn";
+            batteryBadge.textContent = "ATENÇÃO";
+            batteryBar.style.background = "#f59e0b";
+          } else {
+            batteryBadge.className = "badge badge-ok";
+            batteryBadge.textContent = "NOMINAL";
+            batteryBar.style.background = "linear-gradient(90deg, #10b981, #34d399)";
+          }
+
+          const bArr = state.history.battery;
+          batteryMin.textContent = "Mín: " + Math.min(...bArr).toFixed(2) + "%";
+          batteryMax.textContent = "Máx: " + Math.max(...bArr).toFixed(2) + "%";
+          batterySamples.textContent = "Amostras: " + bArr.length;
+          drawSparkline(batterySparkline, bArr, "#10b981", "rgba(16, 185, 129, 0.16)");
+        }
+
+        if (Number.isFinite(temp)) {
+          state.telemetry.temperature_c = temp;
+          state.history.temperature.push(temp);
+          if (state.history.temperature.length > 60) state.history.temperature.shift();
+
+          tempValue.textContent = temp.toFixed(1);
+          const pct = Math.max(0, Math.min(100, ((temp - 20) / 40) * 100));
+          tempBar.style.width = pct + "%";
+
+          if (temp >= 47.5) {
+            tempBadge.className = "badge badge-danger";
+            tempBadge.textContent = "ALTA";
+            tempBar.style.background = "#ef4444";
+          } else if (temp >= 45.0) {
+            tempBadge.className = "badge badge-warn";
+            tempBadge.textContent = "ELEVADA";
+            tempBar.style.background = "#f59e0b";
+          } else {
+            tempBadge.className = "badge badge-ok";
+            tempBadge.textContent = "NORMAL";
+            tempBar.style.background = "linear-gradient(90deg, #38bdf8, #10b981)";
+          }
+
+          const tArr = state.history.temperature;
+          const avg = tArr.reduce((a, b) => a + b, 0) / tArr.length;
+          tempMin.textContent = "Mín: " + Math.min(...tArr).toFixed(1) + " °C";
+          tempAvg.textContent = "Méd: " + avg.toFixed(1) + " °C";
+          tempMax.textContent = "Máx: " + Math.max(...tArr).toFixed(1) + " °C";
+          tempTrendLabel.textContent = "Média recente: " + avg.toFixed(1) + " °C";
+          drawSparkline(tempSparkline, tArr, "#38bdf8", "rgba(56, 189, 248, 0.16)", 36, 50);
+        }
+
+        const f = Number(prox.front);
+        const l = Number(prox.left);
+        const r = Number(prox.right);
+        state.telemetry.proximity_cm = { front: f, left: l, right: r };
+
+        const updateProxBar = (valEl, barEl, val) => {
+          if (!Number.isFinite(val)) return;
+          valEl.textContent = val.toFixed(1) + " cm";
+          valEl.style.color = proxColor(val);
+          barEl.style.width = Math.max(2, Math.min(100, (val / 200) * 100)) + "%";
+          barEl.style.background = proxColor(val);
+        };
+
+        updateProxBar(proxFrontVal, proxFrontBar, f);
+        updateProxBar(proxLeftVal, proxLeftBar, l);
+        updateProxBar(proxRightVal, proxRightBar, r);
+
+        const minProx = Math.min(
+          Number.isFinite(f) ? f : 999,
+          Number.isFinite(l) ? l : 999,
+          Number.isFinite(r) ? r : 999
+        );
+
+        if (minProx < 50) {
+          proxGlobalBadge.className = "badge badge-danger";
+          proxGlobalBadge.textContent = "OBSTÁCULO PRÓXIMO (<50cm)";
+        } else if (minProx < 100) {
+          proxGlobalBadge.className = "badge badge-warn";
+          proxGlobalBadge.textContent = "ATENÇÃO (50–100cm)";
+        } else {
+          proxGlobalBadge.className = "badge badge-ok";
+          proxGlobalBadge.textContent = "CAMINHO LIVRE";
+        }
+
+        drawRadar();
+      }
+
+      function updateStateUI(envelope) {
+        const d = envelope.data || {};
+        state.currentState = d.state || state.currentState;
+        state.previousState = d.previous_state || state.previousState;
+        state.stateReason = d.reason || state.stateReason;
+        state.motion = d.motion || "PARAR";
+
+        currentStateText.textContent = state.currentState;
+        prevStateText.textContent = "anterior: " + state.previousState;
+        stateReasonText.textContent = "motivo: " + state.stateReason;
+
+        motionBadge.textContent = "MOVIMENTO: " + state.motion;
+        motionBadge.className = state.motion === "PARAR" ? "badge badge-sim" : "badge badge-warn";
+
+        const nextValid = VALID_NEXT[state.currentState] || [];
+        document.querySelectorAll(".mode-btn").forEach((btn) => {
+          const m = btn.getAttribute("data-mode");
+          btn.classList.toggle("active-state", m === state.currentState);
+          btn.classList.toggle("next-valid", m !== state.currentState && nextValid.includes(m));
+        });
+      }
+
+      function updateStatusUI(envelope) {
+        const d = envelope.data || {};
+        state.roverOnline = Boolean(d.online);
+        state.roverReason = d.reason || "";
+        if (state.roverOnline) {
+          roverOnlineBadge.className = "badge badge-ok";
+          roverOnlineText.textContent = "ROVER: ONLINE (" + (envelope.source || "sim") + ")";
+        } else {
+          roverOnlineBadge.className = "badge badge-danger";
+          roverOnlineText.textContent = "ROVER: OFFLINE (" + (state.roverReason || "desconectado") + ")";
+        }
+      }
+
+      function updateAckUI(envelope) {
+        const d = envelope.data || {};
+        const ok = Boolean(d.accepted);
+        ackStatusBadge.className = ok ? "badge badge-ok" : "badge badge-danger";
+        ackStatusBadge.textContent = ok ? "ACEITO (" + d.reason + ")" : "REJEITADO (" + d.reason + ")";
+        ackDetails.textContent =
+          "Tópico: " + d.topic +
+          " | Estado: " + d.state +
+          (d.duplicate ? " (DUPLICATA)" : "") +
+          (d.command_id ? " | ID: " + String(d.command_id).slice(0, 8) + "…" : "");
+
+        pushEvent(
+          alarmList,
+          "[ACK] " + (ok ? "ACEITO" : "REJEITADO") + " • " + d.reason + " → estado=" + d.state,
+          ok ? "info" : "warn",
+          envelope.timestamp
+        );
+      }
+
+      function handleEnvelope(envelope) {
+        if (!envelope || typeof envelope !== "object") return;
+        state.lastPacketMs = Date.now();
+
+        switch (envelope.type) {
+          case "telemetry":
+            updateTelemetryUI(envelope);
+            break;
+          case "state":
+            updateStateUI(envelope);
+            break;
+          case "status":
+            updateStatusUI(envelope);
+            break;
+          case "ack":
+            updateAckUI(envelope);
+            break;
+          case "alarm": {
+            const d = envelope.data || {};
+            pushEvent(
+              alarmList,
+              "[ALARME • " + (d.code || "ALERTA") + "] " + (d.message || ""),
+              d.severity === "critical" ? "error" : "warn",
+              envelope.timestamp
+            );
+            break;
+          }
+          case "log": {
+            const d = envelope.data || {};
+            pushEvent(
+              logList,
+              "[" + (d.level || "INFO") + " • " + (d.event || "log") + "] " + (d.message || ""),
+              d.level === "ERROR" ? "error" : d.level === "WARNING" ? "warn" : "info",
+              envelope.timestamp
+            );
+            break;
+          }
+        }
+      }
+
+      // Send Command via WebSocket or HTTP fallback
+      let ws = null;
+
+      function sendCommand(payloadObj) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(payloadObj));
+          return;
+        }
+        fetch("/api/rover/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payloadObj)
+        }).catch((err) => {
+          console.error("Falha ao enviar comando HTTP:", err);
+        });
+      }
+
+      function sendMode(mode) {
+        sendCommand({ kind: "mode", mode: mode });
+      }
+
+      function sendManual(action) {
+        const duration = parseInt(durationSlider.value, 10) || 500;
+        sendCommand({ kind: "manual", action: action, duration_ms: duration });
+      }
+
+      // Connect WebSocket & fetch initial snapshot
+      function loadSnapshot() {
+        fetch("/api/rover/snapshot")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((snap) => {
+            if (!snap) return;
+            if (Array.isArray(snap.history)) {
+              state.history.battery = snap.history
+                .map((h) => Number(h.battery_percent))
+                .filter(Number.isFinite);
+              state.history.temperature = snap.history
+                .map((h) => Number(h.temperature_c))
+                .filter(Number.isFinite);
+            }
+            if (snap.status) handleEnvelope(snap.status);
+            if (snap.state) handleEnvelope(snap.state);
+            if (snap.telemetry) handleEnvelope(snap.telemetry);
+            if (snap.last_ack) updateAckUI(snap.last_ack);
+            if (Array.isArray(snap.alarms)) {
+              snap.alarms.slice().reverse().forEach(handleEnvelope);
+            }
+            if (Array.isArray(snap.logs)) {
+              snap.logs.slice().reverse().forEach(handleEnvelope);
+            }
+          })
+          .catch(() => {});
+      }
+
+      function connectWebSocket() {
+        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const url = proto + "//" + window.location.host + "/ws/rover";
+        ws = new WebSocket(url);
+
+        ws.onopen = function () {
+          state.wsConnected = true;
+          wsBadge.className = "badge badge-ok";
+          wsText.textContent = "WS: Conectado";
+          loadSnapshot();
+        };
+
+        ws.onmessage = function (ev) {
+          try {
+            const msg = JSON.parse(ev.data);
+            handleEnvelope(msg);
+          } catch (_) {}
+        };
+
+        ws.onclose = function () {
+          state.wsConnected = false;
+          wsBadge.className = "badge badge-warn";
+          wsText.textContent = "WS: Reconectando...";
+          setTimeout(connectWebSocket, 1500);
+        };
+
+        ws.onerror = function () {
+          try {
+            ws.close();
+          } catch (_) {}
+        };
+      }
+
+      // Hybrid Camera Controller (Sim HUD + WebRTC WHEP + WebRTC Iframe + MJPEG)
+      function stopRealStreams() {
+        if (state.webrtcPc) {
+          try {
+            state.webrtcPc.close();
+          } catch (_) {}
+          state.webrtcPc = null;
+        }
+        camVideo.srcObject = null;
+        camVideo.style.display = "none";
+        camMjpeg.removeAttribute("src");
+        camMjpeg.style.display = "none";
+        camIframe.src = "about:blank";
+        camIframe.style.display = "none";
+      }
+
+      async function connectWebRtcWhep(whepUrl) {
+        stopRealStreams();
+        camVideo.style.display = "block";
+        try {
+          const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+          });
+          state.webrtcPc = pc;
+          pc.addTransceiver("video", { direction: "recvonly" });
+          pc.ontrack = (event) => {
+            if (event.streams && event.streams[0]) {
+              camVideo.srcObject = event.streams[0];
+            }
+          };
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          const res = await fetch(whepUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/sdp" },
+            body: pc.localDescription.sdp
+          });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const answerSdp = await res.text();
+          await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+          pushEvent(logList, "[CAMERA] WebRTC WHEP conectado em " + whepUrl, "info");
+        } catch (err) {
+          pushEvent(
+            alarmList,
+            "[CAMERA] Falha ao negociar WebRTC WHEP (" + err.message + "). Verifique se MediaMTX/go2rtc está ativo.",
+            "warn"
+          );
+        }
+      }
+
+      function setCameraMode(mode) {
+        state.camMode = mode;
+        document.querySelectorAll("[data-cam-mode]").forEach((b) => {
+          b.classList.toggle("active", b.getAttribute("data-cam-mode") === mode);
+        });
+
+        stopRealStreams();
+
+        if (mode === "sim") {
+          camConfigBar.style.display = "none";
+          camHudCanvas.style.display = "block";
+        } else {
+          camConfigBar.style.display = "flex";
+          camHudCanvas.style.display = chkHudOverlay.checked ? "block" : "none";
+          const saved = localStorage.getItem("rover_cam_url_" + mode);
+          if (mode === "webrtc") {
+            camUrlLabel.textContent = "Endpoint WHEP:";
+            camUrlInput.value = saved || "http://192.168.1.50:8889/rover/whep";
+          } else if (mode === "iframe") {
+            camUrlLabel.textContent = "URL Player WebRTC:";
+            camUrlInput.value = saved || "http://192.168.1.50:8889/rover";
+          } else if (mode === "mjpeg") {
+            camUrlLabel.textContent = "URL Stream MJPEG:";
+            camUrlInput.value = saved || "http://192.168.1.50:8080/?action=stream";
+          }
+        }
+      }
+
+      document.querySelectorAll("[data-cam-mode]").forEach((btn) => {
+        btn.addEventListener("click", () => setCameraMode(btn.getAttribute("data-cam-mode")));
+      });
+
+      document.getElementById("btnCamConnect").addEventListener("click", () => {
+        const url = camUrlInput.value.trim();
+        if (!url) return;
+        localStorage.setItem("rover_cam_url_" + state.camMode, url);
+        if (state.camMode === "webrtc") {
+          connectWebRtcWhep(url);
+        } else if (state.camMode === "iframe") {
+          stopRealStreams();
+          camIframe.style.display = "block";
+          camIframe.src = url;
+        } else if (state.camMode === "mjpeg") {
+          stopRealStreams();
+          camMjpeg.style.display = "block";
+          camMjpeg.src = url;
+        }
+      });
+
+      document.getElementById("btnCamDisconnect").addEventListener("click", stopRealStreams);
+
+      chkHudOverlay.addEventListener("change", () => {
+        if (state.camMode !== "sim") {
+          camHudCanvas.style.display = chkHudOverlay.checked ? "block" : "none";
+        }
+      });
+
+      // Render Simulated Camera & Tactical HUD Overlay
+      function renderCameraHud() {
+        const ctx = camHudCanvas.getContext("2d");
+        const w = camHudCanvas.width;
+        const h = camHudCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        if (state.motion === "AVANCAR") state.simTick += 2.2;
+        else if (state.motion === "RECUAR") state.simTick -= 2.2;
+        else if (state.state !== "SEGURO_ESPERA") state.simTick += 0.45;
+
+        // Synthetic background when in Simulator mode
+        if (state.camMode === "sim") {
+          const sky = ctx.createLinearGradient(0, 0, 0, h * 0.52);
+          sky.addColorStop(0, "#060b16");
+          sky.addColorStop(1, "#0f1e36");
+          ctx.fillStyle = sky;
+          ctx.fillRect(0, 0, w, h * 0.52);
+
+          const ground = ctx.createLinearGradient(0, h * 0.52, 0, h);
+          ground.addColorStop(0, "#0b1526");
+          ground.addColorStop(1, "#050911");
+          ctx.fillStyle = ground;
+          ctx.fillRect(0, h * 0.52, w, h * 0.48);
+
+          // Perspective grid
+          const horizon = h * 0.52;
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.2)";
+          ctx.lineWidth = 1;
+          for (let i = -8; i <= 8; i++) {
+            ctx.beginPath();
+            ctx.moveTo(w / 2 + i * 18, horizon);
+            ctx.lineTo(w / 2 + i * 120, h);
+            ctx.stroke();
+          }
+
+          const offset = ((state.simTick % 20) + 20) % 20;
+          for (let d = 1; d <= 7; d++) {
+            const norm = (d * 20 - offset) / 140;
+            const y = horizon + Math.pow(norm, 1.5) * (h - horizon);
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+          }
+
+          // Simulated target box based on state machine
+          if (state.currentState !== "SEGURO_ESPERA") {
+            const boxSize =
+              state.currentState === "BUSCA"
+                ? 70
+                : state.currentState === "APROXIMACAO"
+                ? 115
+                : 150;
+            const wobble =
+              state.currentState === "BUSCA" ? Math.sin(Date.now() / 600) * 90 : 0;
+            const bx = w / 2 - boxSize / 2 + wobble;
+            const by = horizon - boxSize * 0.35;
+
+            ctx.strokeStyle =
+              state.currentState === "CAPTURA_MANUAL" ? "#10b981" : "#f59e0b";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(bx, by, boxSize, boxSize);
+
+            ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+            ctx.fillRect(bx, by - 22, boxSize, 20);
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "bold 11px monospace";
+            ctx.fillText("ALVO SIMULADO [" + state.currentState + "]", bx + 6, by - 8);
+          }
+        }
+
+        // HUD Overlay (crosshair + telemetry readouts)
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.65)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, 26, 0, Math.PI * 2);
+        ctx.moveTo(w / 2 - 42, h / 2);
+        ctx.lineTo(w / 2 - 12, h / 2);
+        ctx.moveTo(w / 2 + 12, h / 2);
+        ctx.lineTo(w / 2 + 42, h / 2);
+        ctx.moveTo(w / 2, h / 2 - 42);
+        ctx.lineTo(w / 2, h / 2 - 12);
+        ctx.moveTo(w / 2, h / 2 + 12);
+        ctx.lineTo(w / 2, h / 2 + 42);
+        ctx.stroke();
+
+        // Top HUD bar
+        ctx.fillStyle = "rgba(9, 13, 22, 0.72)";
+        ctx.fillRect(14, 14, w - 28, 32);
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 12px monospace";
+        const batTxt =
+          state.telemetry.battery_percent !== null
+            ? state.telemetry.battery_percent.toFixed(1) + "%"
+            : "--%";
+        const tmpTxt =
+          state.telemetry.temperature_c !== null
+            ? state.telemetry.temperature_c.toFixed(1) + "°C"
+            : "--°C";
+        const frTxt =
+          state.telemetry.proximity_cm.front !== null
+            ? state.telemetry.proximity_cm.front.toFixed(0) + "cm"
+            : "--cm";
+        ctx.fillText(
+          "MODO: " +
+            state.currentState +
+            "   |   MOV: " +
+            state.motion +
+            "   |   BAT: " +
+            batTxt +
+            "   |   TEMP: " +
+            tmpTxt +
+            "   |   FRENTE: " +
+            frTxt,
+          26,
+          34
+        );
+
+        requestAnimationFrame(renderCameraHud);
+      }
+
+      // Bind Controls
+      document.querySelectorAll(".mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => sendMode(btn.getAttribute("data-mode")));
+      });
+
+      document.querySelectorAll(".dpad-btn").forEach((btn) => {
+        btn.addEventListener("click", () => sendManual(btn.getAttribute("data-action")));
+      });
+
+      document.getElementById("btnEmergencyTop").addEventListener("click", () => {
+        sendManual("PARAR");
+      });
+
+      durationSlider.addEventListener("input", () => {
+        durationLabel.textContent = durationSlider.value + " ms";
+      });
+
+      document.getElementById("btnClearAlarms").addEventListener("click", () => {
+        alarmList.innerHTML = "";
+      });
+
+      document.getElementById("btnClearLogs").addEventListener("click", () => {
+        logList.innerHTML = "";
+      });
+
+      window.addEventListener("keydown", (ev) => {
+        if (!chkKeyboard.checked) return;
+        const tag = (ev.target && ev.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+        const key = ev.key.toLowerCase();
+        let action = null;
+        if (key === " " || key === "escape") action = "PARAR";
+        else if (key === "w" || key === "arrowup") action = "AVANCAR";
+        else if (key === "s" || key === "arrowdown") action = "RECUAR";
+        else if (key === "a" || key === "arrowleft") action = "ESQUERDA";
+        else if (key === "d" || key === "arrowright") action = "DIREITA";
+
+        if (action) {
+          ev.preventDefault();
+          sendManual(action);
+        }
+      });
+
+      // Age ticker
+      setInterval(() => {
+        if (!state.lastPacketMs) {
+          lastSeenBadge.textContent = "Último pacote: aguardando";
+          return;
+        }
+        const sec = ((Date.now() - state.lastPacketMs) / 1000).toFixed(1);
+        lastSeenBadge.textContent = "Último pacote: há " + sec + "s";
+      }, 300);
+
+      drawRadar();
+      connectWebSocket();
+      requestAnimationFrame(renderCameraHud);
+    })();
+  </script>
+</body>
+</html>

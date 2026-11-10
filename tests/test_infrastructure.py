@@ -35,6 +35,20 @@ def test_flow_wiring_and_no_retained_commands():
     assert next(node for node in flow if node["type"] == "mqtt-broker")["protocolVersion"] == "5"
 
 
+def test_dashboard_nodes_and_html_sync():
+    flow = json.loads((ROOT / "apps/station/node-red/flows.json").read_text(encoding="utf-8"))
+    html = (ROOT / "apps/station/node-red/dashboard.html").read_text(encoding="utf-8")
+    by_id = {node["id"]: node for node in flow}
+    assert by_id["dashboard-http-in"]["url"] == "/dashboard"
+    assert by_id["snapshot-http-in"]["url"] == "/api/rover/snapshot"
+    assert by_id["cmd-http-in"]["url"] == "/api/rover/command"
+    assert by_id["dashboard-ws-server"]["path"] == "/ws/rover"
+    assert by_id["dashboard-ui-template"]["template"] == html
+    assert "WebRTC (WHEP)" in html
+    assert "MJPEG HTTP" in html
+    assert "rover/telemetria" in html
+
+
 def test_retained_policy():
     assert {topic for topic, (_, retain) in POLICY.items() if retain} == {"rover/status", "rover/estado"}
     assert POLICY["rover/telemetria"][0] == 0

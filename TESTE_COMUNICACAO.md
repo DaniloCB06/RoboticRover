@@ -158,12 +158,14 @@ Não altere esses valores para o teste sem hardware.
 
 ## 5. Iniciar Mosquitto e Node-RED
 
+### 5.A. Com Docker (Docker Compose)
+
 No primeiro terminal:
 
 ```bash
 docker compose config
 docker compose pull
-docker compose up -d
+docker compose up -d --force-recreate node-red-init node-red
 docker compose ps
 ```
 
@@ -183,6 +185,30 @@ docker compose logs --tail 100 mosquitto node-red
 O serviço `node-red-init` prepara o fluxo no volume e encerra. Em
 `docker compose ps --all`, `node-red-init` aparecer como `Exited (0)` é esperado
 e significa sucesso.
+
+### 5.B. Sem Docker (Mosquitto + Node-RED nativos no Windows, macOS ou Linux)
+
+Se a máquina não utiliza Docker, inicie **Mosquitto** e **Node-RED** em dois terminais separados na raiz do repositório:
+
+1. **Terminal 1 — Mosquitto:**
+   - **macOS / Linux:**
+     ```bash
+     mosquitto -c infra/mqtt/mosquitto.conf -v
+     ```
+   - **Windows (PowerShell):**
+     ```powershell
+     & "C:\Program Files\mosquitto\mosquitto.exe" -c infra\mqtt\mosquitto.conf -v
+     ```
+2. **Terminal 2 — Node-RED (carregando o fluxo e a Dashboard do projeto):**
+   - **macOS / Linux:**
+     ```bash
+     node-red --settings apps/station/node-red/settings.js apps/station/node-red/flows.json
+     ```
+   - **Windows (PowerShell):**
+     ```powershell
+     node-red --settings apps\station\node-red\settings.js apps\station\node-red\flows.json
+     ```
+   *(Ou, se o Node-RED já estiver em execução, abra <http://127.0.0.1:1880>, use o menu `☰ → Import`, selecione `apps/station/node-red/flows.json` e clique em **Deploy**).*
 
 ## 6. Iniciar o Rover simulado
 
@@ -214,7 +240,32 @@ docker compose logs --tail 100 mosquitto
 As linhas de telemetria no terminal são logs da geração local. Elas só chegam ao
 Node-RED depois que a conexão com Mosquitto é estabelecida.
 
-## 7. Abrir e testar no Node-RED
+## 7. Abrir a Dashboard do Operador e o Node-RED
+
+### 7.1 Dashboard do Operador (recomendado)
+
+Abra no navegador:
+
+[http://127.0.0.1:1880/dashboard](http://127.0.0.1:1880/dashboard)
+
+Se você já havia subido o container antes desta atualização, recrie o Node-RED uma
+vez para o inicializador atualizar o fluxo com a dashboard:
+
+```bash
+docker compose up -d --force-recreate node-red-init node-red
+```
+
+Na Dashboard você poderá:
+
+- Acompanhar **bateria (%)**, **temperatura (°C)** com gráficos em tempo real e o
+  **Radar 2D de Proximidade** (`front`, `left`, `right` em cm).
+- Alternar a câmera entre **Simulador HUD**, **WebRTC (WHEP)**, **WebRTC (Iframe)**
+  e **MJPEG HTTP**.
+- Comandar os modos (`BUSCA → APROXIMACAO → AGUARDANDO_PEGA → CAPTURA_MANUAL`) e
+  dirigir manualmente pelos botões ou pelo teclado (`W`, `A`, `S`, `D`, Setas e
+  `Espaço` para parada de emergência).
+
+### 7.2 Editor e Debug do Node-RED
 
 Abra diretamente:
 
