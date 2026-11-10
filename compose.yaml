@@ -1,0 +1,56 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    ports:
+      - "${MQTT_BIND_ADDRESS:-127.0.0.1}:${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./infra/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "127.0.0.1", "-t", "healthcheck", "-m", "ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks: [rover]
+  node-red-init:
+    image: nodered/node-red:4.1.1
+    user: "0:0"
+    restart: "no"
+    network_mode: "none"
+    environment:
+      NODE_RED_FLOW_FILE: /data/flows.json
+      ROVER_FLOW_FILE: /opt/rover/flows.json
+    volumes:
+      - node_red_data:/data
+      - ./apps/station/node-red/flows.json:/opt/rover/flows.json:ro
+      - ./apps/station/node-red/init-flows.js:/opt/rover/init-flows.js:ro
+    entrypoint: ["node", "/opt/rover/init-flows.js"]
+  node-red:
+    image: nodered/node-red:4.1.1
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      node-red-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${NODE_RED_PORT:-1880}:1880"
+    environment:
+      MQTT_HOST: ${STATION_MQTT_HOST:-mosquitto}
+      MQTT_PORT: ${STATION_MQTT_PORT:-1883}
+      STATION_CLIENT_ID: ${STATION_CLIENT_ID:-station-nodered-01}
+      STATION_SOURCE: ${STATION_SOURCE:-station-nodered}
+      NODE_RED_USER_DIR: /data
+      NODE_RED_FLOW_FILE: /data/flows.json
+      ROVER_FLOW_FILE: /opt/rover/flows.json
+    volumes:
+      - node_red_data:/data
+      - ./apps/station/node-red/flows.json:/opt/rover/flows.json:ro
+      - ./apps/station/node-red/settings.js:/data/settings.js:ro
+    command: ["--settings", "/data/settings.js"]
+    networks: [rover]
+networks:
+  rover:
+    driver: bridge
+volumes:
+  node_red_data:

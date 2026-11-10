@@ -1,0 +1,548 @@
+[
+  {
+    "id": "rover-tab",
+    "type": "tab",
+    "label": "RoboticRover • SIMULAÇÃO",
+    "disabled": false,
+    "info": "Somente dados artificiais. UUID e TTL por comando. Heartbeat não retained a cada segundo. Parada MQTT não substitui emergência física."
+  },
+  {
+    "id": "broker",
+    "type": "mqtt-broker",
+    "name": "Mosquitto (ambiente)",
+    "broker": "${MQTT_HOST}",
+    "port": "${MQTT_PORT}",
+    "clientid": "${STATION_CLIENT_ID}",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "5",
+    "keepalive": "5",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "sessionExpiry": "0"
+  },
+  {
+    "id": "rx",
+    "type": "mqtt in",
+    "z": "rover-tab",
+    "name": "Rover → estação",
+    "topic": "rover/#",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "x": 140,
+    "y": 100,
+    "wires": [
+      [
+        "json"
+      ]
+    ]
+  },
+  {
+    "id": "json",
+    "type": "json",
+    "z": "rover-tab",
+    "name": "Interpretar JSON",
+    "property": "payload",
+    "action": "obj",
+    "pretty": false,
+    "x": 360,
+    "y": 100,
+    "wires": [
+      [
+        "validate"
+      ]
+    ]
+  },
+  {
+    "id": "validate",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Verificar envelope e tópico",
+    "func": "const types = {\"rover/estado\":\"state\",\"rover/telemetria\":\"telemetry\",\"rover/alarme\":\"alarm\",\"rover/log\":\"log\",\"rover/status\":\"status\",\"rover/cmd/ack\":\"ack\"};\nif (!types[msg.topic]) return null;\nconst p = msg.payload;\nif (!p || p.version !== \"1.0\" || p.simulated !== true || p.type !== types[msg.topic] ||\n    typeof p.source !== \"string\" || !p.source || !Number.isFinite(Date.parse(p.timestamp)) ||\n    !p.data || typeof p.data !== \"object\" || Array.isArray(p.data)) {\n    node.error(\"Envelope inválido recebido\", msg); return null;\n}\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 600,
+    "y": 100,
+    "wires": [
+      [
+        "route"
+      ]
+    ]
+  },
+  {
+    "id": "route",
+    "type": "switch",
+    "z": "rover-tab",
+    "name": "Tipo de mensagem",
+    "property": "topic",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "rover/estado",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/telemetria",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/alarme",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/log",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/status",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/cmd/ack",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 6,
+    "x": 850,
+    "y": 100,
+    "wires": [
+      [
+        "debug-state"
+      ],
+      [
+        "debug-telemetry"
+      ],
+      [
+        "debug-alarm"
+      ],
+      [
+        "debug-log"
+      ],
+      [
+        "debug-status"
+      ],
+      [
+        "debug-ack"
+      ]
+    ]
+  },
+  {
+    "id": "catch",
+    "type": "catch",
+    "z": "rover-tab",
+    "name": "Erros do fluxo",
+    "scope": null,
+    "uncaught": false,
+    "x": 150,
+    "y": 240,
+    "wires": [
+      [
+        "debug-errors"
+      ]
+    ]
+  },
+  {
+    "id": "debug-errors",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "Erros / JSON inválido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 430,
+    "y": 240,
+    "wires": []
+  },
+  {
+    "id": "heartbeat-timer",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "Heartbeat 1 s (SIMULADO)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "1",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "payload": "",
+    "payloadType": "date",
+    "x": 180,
+    "y": 320,
+    "wires": [
+      [
+        "heartbeat"
+      ]
+    ]
+  },
+  {
+    "id": "heartbeat",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Heartbeat fresco; sessão da estação",
+    "func": "const crypto = global.get(\"crypto\");\nif (!crypto) { node.error(\"Configure functionGlobalContext.crypto conforme settings.js\", msg); return null; }\nlet session = context.get(\"session\");\nif (!session) { session = crypto.randomUUID(); context.set(\"session\", session); }\nmsg.topic = \"station/heartbeat\";\nmsg.qos = 1; msg.retain = false;\nmsg.payload = JSON.stringify({version:\"1.0\",timestamp:new Date().toISOString(),\n  source:env.get(\"STATION_SOURCE\") || \"station-nodered\",simulated:true,type:\"heartbeat\",\n  data:{online:true,session_id:session}});\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 510,
+    "y": 320,
+    "wires": [
+      [
+        "tx"
+      ]
+    ]
+  },
+  {
+    "id": "command",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Comando: UUID + TTL 5 s",
+    "func": "const crypto = global.get(\"crypto\");\nif (!crypto) { node.error(\"Configure functionGlobalContext.crypto conforme settings.js\", msg); return null; }\nconst now = Date.now();\nconst mode = msg.topic === \"rover/cmd/modo\";\nconst data = {command_id:crypto.randomUUID(),expires_at:new Date(now + 5000).toISOString()};\nif (mode) data.mode = msg.payload;\nelse { data.action = msg.payload; data.duration_ms = 500; }\nmsg.payload = JSON.stringify({version:\"1.0\",timestamp:new Date(now).toISOString(),\n  source:env.get(\"STATION_SOURCE\") || \"station-nodered\",simulated:true,\n  type:mode ? \"mode_command\":\"manual_command\",data});\nmsg.qos = 1; msg.retain = false;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 520,
+    "y": 600,
+    "wires": [
+      [
+        "tx"
+      ]
+    ]
+  },
+  {
+    "id": "tx",
+    "type": "mqtt out",
+    "z": "rover-tab",
+    "name": "Estação → Rover (nunca retained)",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "application/json",
+    "userProps": "",
+    "correl": "",
+    "expiry": "5",
+    "broker": "broker",
+    "x": 890,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "comment-safety",
+    "type": "comment",
+    "z": "rover-tab",
+    "name": "SIMULAÇÃO • avance em sequência; PARAR sempre leva a SEGURO_ESPERA",
+    "info": "Heartbeat ausente por 4 s ou desconexão => estado seguro. Comandos de movimento só em CAPTURA_MANUAL; duração máxima 1 s. Dados artificiais. Emergência física e watchdog Arduino serão independentes.",
+    "x": 440,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "debug-state",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · state",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "debug-telemetry",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · telemetry",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 75,
+    "wires": []
+  },
+  {
+    "id": "debug-alarm",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · alarm",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 110,
+    "wires": []
+  },
+  {
+    "id": "debug-log",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · log",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 145,
+    "wires": []
+  },
+  {
+    "id": "debug-status",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · status",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "debug-ack",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · ack",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 215,
+    "wires": []
+  },
+  {
+    "id": "inject-busca",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "BUSCA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "BUSCA",
+    "payloadType": "str",
+    "x": 180,
+    "y": 450,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-aproximacao",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "APROXIMACAO (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "APROXIMACAO",
+    "payloadType": "str",
+    "x": 180,
+    "y": 500,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-aguardando_pega",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "AGUARDANDO_PEGA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "AGUARDANDO_PEGA",
+    "payloadType": "str",
+    "x": 180,
+    "y": 550,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-captura_manual",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "CAPTURA_MANUAL (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "CAPTURA_MANUAL",
+    "payloadType": "str",
+    "x": 180,
+    "y": 600,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-seguro_espera",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "SEGURO_ESPERA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "SEGURO_ESPERA",
+    "payloadType": "str",
+    "x": 180,
+    "y": 650,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-parar",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "PARAR (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "PARAR",
+    "payloadType": "str",
+    "x": 180,
+    "y": 700,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-avancar",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "AVANCAR (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "AVANCAR",
+    "payloadType": "str",
+    "x": 180,
+    "y": 750,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  }
+]

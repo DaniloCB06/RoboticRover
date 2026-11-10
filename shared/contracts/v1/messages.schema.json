@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roboticrover.local/contracts/v1/messages.schema.json",
+  "title": "RoboticRover MQTT v1 — somente simulação",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": "1.0"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "simulated": {
+      "const": true
+    },
+    "type": {
+      "enum": [
+        "state",
+        "telemetry",
+        "alarm",
+        "log",
+        "status",
+        "mode_command",
+        "manual_command",
+        "ack",
+        "heartbeat"
+      ]
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "version",
+    "timestamp",
+    "source",
+    "simulated",
+    "type",
+    "data"
+  ],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "type": {
+          "const": "state"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "enum": [
+                "BUSCA",
+                "APROXIMACAO",
+                "AGUARDANDO_PEGA",
+                "CAPTURA_MANUAL",
+                "SEGURO_ESPERA"
+              ]
+            },
+            "previous_state": {
+              "enum": [
+                "BUSCA",
+                "APROXIMACAO",
+                "AGUARDANDO_PEGA",
+                "CAPTURA_MANUAL",
+                "SEGURO_ESPERA"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            },
+            "motion": {
+              "enum": [
+                "PARAR",
+                "AVANCAR",
+                "RECUAR",
+                "ESQUERDA",
+                "DIREITA"
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "previous_state",
+            "reason",
+            "motion"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "telemetry"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "battery_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "temperature_c": {
+              "type": "number",
+              "minimum": -40,
+              "maximum": 125
+            },
+            "proximity_cm": {
+              "type": "object",
+              "properties": {
+                "front": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "left": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "right": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                }
+              },
+              "required": [
+                "front",
+                "left",
+                "right"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "battery_percent",
+            "temperature_c",
+            "proximity_cm"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "alarm"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            },
+            "severity": {
+              "enum": [
+                "warning",
+                "critical"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "log"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "level": {
+              "enum": [
+                "INFO",
+                "WARNING",
+                "ERROR"
+              ]
+            },
+            "event": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            }
+          },
+          "required": [
+            "level",
+            "event",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "status"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "online": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            }
+          },
+          "required": [
+            "online",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "mode_command"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "command_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "mode": {
+              "enum": [
+                "BUSCA",
+                "APROXIMACAO",
+                "AGUARDANDO_PEGA",
+                "CAPTURA_MANUAL",
+                "SEGURO_ESPERA"
+              ]
+            }
+          },
+          "required": [
+            "command_id",
+            "expires_at",
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "manual_command"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "command_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "action": {
+              "enum": [
+                "PARAR",
+                "AVANCAR",
+                "RECUAR",
+                "ESQUERDA",
+                "DIREITA"
+              ]
+            },
+            "duration_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1000
+            }
+          },
+          "required": [
+            "command_id",
+            "expires_at",
+            "action",
+            "duration_ms"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "ack"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "command_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "topic": {
+              "enum": [
+                "rover/cmd/modo",
+                "rover/cmd/manual"
+              ]
+            },
+            "accepted": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            },
+            "state": {
+              "enum": [
+                "BUSCA",
+                "APROXIMACAO",
+                "AGUARDANDO_PEGA",
+                "CAPTURA_MANUAL",
+                "SEGURO_ESPERA"
+              ]
+            },
+            "duplicate": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "command_id",
+            "topic",
+            "accepted",
+            "reason",
+            "state",
+            "duplicate"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "properties": {
+        "type": {
+          "const": "heartbeat"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "online": {
+              "const": true
+            },
+            "session_id": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "online",
+            "session_id"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

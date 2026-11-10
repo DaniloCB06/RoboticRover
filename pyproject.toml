@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robotic-rover"
+version = "0.1.0"
+description = "Infraestrutura MQTT e simulador explícito do RoboticRover"
+requires-python = ">=3.9"
+dependencies = ["paho-mqtt==2.1.0", "jsonschema==4.23.0", "rfc3339-validator==0.1.4", "python-dotenv==1.0.1"]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.5", "PyYAML==6.0.2", "websocket-client==1.8.0"]
+
+[project.scripts]
+rover-sim = "rover.__main__:main"
+
+[tool.setuptools]
+packages = ["rover", "rover_contracts"]
+package-dir = { rover = "apps/rover/rover", rover_contracts = "shared/contracts" }
+
+[tool.setuptools.package-data]
+rover_contracts = ["v1/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requer Mosquitto e Node-RED em execução"]
