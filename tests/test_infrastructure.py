@@ -44,6 +44,7 @@ def test_dashboard_nodes_and_html_sync():
     assert by_id["cmd-http-in"]["url"] == "/api/rover/command"
     assert by_id["dashboard-ws-server"]["path"] == "/ws/rover"
     assert by_id["dashboard-ui-template"]["template"] == html
+    assert 'typeof p.simulated !== "boolean"' in by_id["validate"]["func"]
     assert "WebRTC (WHEP)" in html
     assert "MJPEG HTTP" in html
     assert "rover/telemetria" in html

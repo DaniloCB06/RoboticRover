@@ -13,8 +13,10 @@ function isStockOrOutdatedRoverFlow(file) {
             nodes.some((node) => node.type === "tab" && node.label === "Flow 1") &&
             nodes.some((node) => node.type === "comment" &&
                 node.name.startsWith("WARNING: please check you have started this container"));
-        const isOutdatedRover = nodes.some((node) => node.id === "rover-tab") &&
-            !nodes.some((node) => node.id === "dashboard-http-in");
+        const isOutdatedRover = nodes.some((node) => node.id === "rover-tab") && (
+            !nodes.some((node) => node.id === "dashboard-http-in") ||
+            nodes.some((node) => node.id === "validate" && typeof node.func === "string" && node.func.includes("p.simulated !== true"))
+        );
         return isStock || isOutdatedRover;
     } catch (_) {
         // Arquivos existentes inválidos são preservados para diagnóstico.

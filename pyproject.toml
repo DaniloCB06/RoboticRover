@@ -14,14 +14,17 @@ dev = ["pytest==8.3.5", "PyYAML==6.0.2", "websocket-client==1.8.0"]
 
 [project.scripts]
 rover-sim = "rover.__main__:main"
+rover-pi3 = "roboticrover_pi3.main:main"
 
 [tool.setuptools]
-packages = ["rover", "rover_contracts"]
-package-dir = { rover = "apps/rover/rover", rover_contracts = "shared/contracts" }
+packages = ["rover", "roboticrover_pi3", "rover_contracts"]
+package-dir = { rover = "apps/rover/rover", roboticrover_pi3 = "apps/rover/roboticrover_pi3", rover_contracts = "shared/contracts" }
 
 [tool.setuptools.package-data]
 rover_contracts = ["v1/*.json"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+pythonpath = [".", "apps/rover", "tests"]
+addopts = ["--import-mode=importlib"]
+testpaths = ["tests", "apps/rover/tests"]
 markers = ["integration: requer Mosquitto e Node-RED em execução"]

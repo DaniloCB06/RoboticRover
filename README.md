@@ -20,9 +20,10 @@ Para um roteiro adicional de laboratório, consulte também [TESTE_COMUNICACAO.m
 4. [Linux — Instalação e Execução (Com e Sem Docker)](#4-linux--instalação-e-execução)
 5. [Como Visualizar e Testar o Funcionamento](#5-como-visualizar-e-testar-o-funcionamento)
 6. [Como Executar os Testes Automatizados](#6-como-executar-os-testes-automatizados)
-7. [Simulação de Falhas, Quedas e Reconexão](#7-simulação-de-falhas-quedas-e-reconexão)
-8. [Configuração (`.env`), Tópicos e Contratos JSON](#8-configuração-env-tópicos-e-contratos-json)
-9. [Estrutura do Repositório e Evolução para o Rover Físico](#9-estrutura-do-repositório-e-evolução-para-o-rover-físico)
+7. [Cliente de Preparação da Raspberry Pi 3 (`roboticrover_pi3`)](#7-cliente-de-preparação-da-raspberry-pi-3-roboticrover_pi3)
+8. [Simulação de Falhas, Quedas e Reconexão](#8-simulação-de-falhas-quedas-e-reconexão)
+9. [Configuração (`.env`), Tópicos e Contratos JSON](#9-configuração-env-tópicos-e-contratos-json)
+10. [Estrutura do Repositório e Evolução para o Rover Físico](#10-estrutura-do-repositório-e-evolução-para-o-rover-físico)
 
 ---
 
@@ -343,7 +344,14 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
   ```bash
   .venv/bin/python -m pytest -q
   ```
-*(Resultado esperado: **106 aprovados** e **8 ignorados**, referentes aos testes de integração real).*
+*(Resultado esperado: **125 aprovados** e **8 ignorados**, referentes aos testes de integração real).*
+
+Também é possível rodar isoladamente a suíte `unittest` do pacote da Raspberry Pi 3:
+```bash
+cd apps/rover
+../../.venv/bin/python -m unittest discover -s tests -v
+```
+*(Resultado esperado: **19 testes aprovados**).*
 
 ### 6.2. Testes de Integração Real (com Mosquitto e Node-RED ativos — Com ou Sem Docker)
 
@@ -364,7 +372,54 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
 
 ---
 
-## 7. Simulação de Falhas, Quedas e Reconexão
+## 7. Cliente de Preparação da Raspberry Pi 3 (`roboticrover_pi3`)
+
+Além do simulador completo (`python -m rover`), o repositório inclui o pacote leve **`roboticrover_pi3`** (em `apps/rover/roboticrover_pi3/`), projetado especificamente para o **teste de fumaça MQTT da Raspberry Pi 3 ↔ estação-base** antes de conectar o Arduino Mega ou motores. Detalhes adicionais estão em [docs/PI3_MQTT.md](docs/PI3_MQTT.md) e [shared/contracts/MQTT_V1.md](shared/contracts/MQTT_V1.md).
+
+Características do `roboticrover_pi3`:
+- Publica `rover/status` com `simulated: false`, `online: true/false` (incluindo LWT retained) e o `hostname` real do Linux, comprovando a conectividade da placa.
+- Mantém `simulated: true` e `execution: "simulated_only"` em `rover/cmd/ack` e `rover/estado` (`hardware_actuation: false`), deixando explícito que **nenhum motor ou pino físico é acionado**.
+- Não publica telemetria inventada por padrão (`ENABLE_MOCK_TELEMETRY=false`).
+- Valida UUID, TTL (`expires_at`), janela de timestamp, sessão de `station/heartbeat` e rejeita comandos `retained`.
+
+### 7.1. Rodar o cliente da Pi 3 agora no notebook (sem a placa física)
+
+Pare o simulador `rover` anterior (`Ctrl+C`) para não haver dois clientes disputando os mesmos tópicos e execute na raiz do projeto:
+
+- **Windows (PowerShell):**
+  ```powershell
+  .\.venv\Scripts\python.exe -m roboticrover_pi3
+  ```
+- **macOS / Linux:**
+  ```bash
+  .venv/bin/python -m roboticrover_pi3
+  ```
+*(Ou diretamente em `apps/rover`: copie `apps/rover/.env.example` para `apps/rover/.env`, defina `MQTT_HOST=127.0.0.1` e execute `python -m roboticrover_pi3`).*
+
+Abra a Dashboard (<http://127.0.0.1:1880/dashboard>): o topo mostrará `PI 3 MQTT • SEM ATUAÇÃO FÍSICA` e `ROVER: ONLINE (raspberry-pi3 • <hostname>)`, permitindo testar toda a máquina de estados e os ACKs (`execution: simulated_only`).
+
+### 7.2. Rodar posteriormente na Raspberry Pi 3 real (quando a placa estiver pronta)
+
+1. Conecte a Raspberry Pi 3 e o notebook (estação-base) à mesma rede Wi-Fi.
+2. No notebook, configure o Mosquitto para escutar na rede local com autenticação/ACL (veja [docs/seguranca.md](docs/seguranca.md)) e descubra o IP local do notebook (ex.: `192.168.1.100`).
+3. Na Raspberry Pi 3 (via SSH), clone o repositório e instale apenas as dependências leves de `apps/rover`:
+   ```bash
+   cd RoboticRover/apps/rover
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install -r requirements.txt
+   cp .env.example .env
+   ```
+4. Edite `apps/rover/.env` na Raspberry Pi 3 apontando `MQTT_HOST` para o **IP do notebook** (nunca `127.0.0.1` na Pi, pois o broker roda no notebook).
+5. Execute os testes locais e inicie o cliente na Pi 3:
+   ```bash
+   python -m unittest discover -s tests -v
+   python -m roboticrover_pi3
+   ```
+
+---
+
+## 8. Simulação de Falhas, Quedas e Reconexão
 
 Execute apenas uma instância do simulador por vez (`Ctrl+C` para parar):
 
@@ -386,7 +441,7 @@ Execute apenas uma instância do simulador por vez (`Ctrl+C` para parar):
 
 ---
 
-## 8. Configuração (`.env`), Tópicos e Contratos JSON
+## 9. Configuração (`.env`), Tópicos e Contratos JSON
 
 As opções estão documentadas em [.env.example](.env.example):
 
@@ -421,17 +476,18 @@ Schema completo (JSON Schema Draft 2020-12) em [shared/contracts/v1/messages.sch
 
 ---
 
-## 9. Estrutura do Repositório e Evolução para o Rover Físico
+## 10. Estrutura do Repositório e Evolução para o Rover Físico
 
 ```text
-apps/rover/rover/              Cliente MQTT, controlador de estados, sensores simulados e CLI Python
+apps/rover/rover/              Simulador completo com telemetria artificial e injeção de falhas
+apps/rover/roboticrover_pi3/   Cliente MQTT leve da Raspberry Pi 3 (status real Linux + estados simulados)
 apps/station/node-red/         Fluxo importável (flows.json), Dashboard HTML (dashboard.html) e settings.js
 firmware/arduino-mega/         Especificação e espaço para o futuro firmware do Arduino Mega 2560
 vision/                        Espaço para captura de câmera e modelos de visão computacional
-shared/contracts/v1/           JSON Schema versionado das mensagens MQTT
+shared/contracts/v1/           JSON Schema versionado das mensagens MQTT e contrato MQTT_V1.md
 infra/mqtt/                    Configuração do broker Mosquitto para desenvolvimento
 tests/                         Testes unitários, de infraestrutura e de integração MQTT/Node-RED
-docs/                          Documentação de protocolo, segurança e verificação
+docs/                          Documentação de protocolo, segurança, verificação e preparação da Pi 3
 ```
 
 Para substituir o simulador pelo Rover físico na Raspberry Pi 3:

@@ -1245,7 +1245,11 @@
         state.source = envelope.source || state.source;
         telemetrySourceLabel.textContent = "origem: " + state.source + " • " + formatTime(envelope.timestamp);
 
-        const bat = Number(d.battery_percent);
+        let bat = Number(d.battery_percent);
+        const voltageDirect = Number(d.battery_voltage_v);
+        if (!Number.isFinite(bat) && Number.isFinite(voltageDirect)) {
+          bat = Math.max(0, Math.min(100, ((voltageDirect - 9.6) / 3.0) * 100));
+        }
         const temp = Number(d.temperature_c);
         const prox = d.proximity_cm || {};
 
@@ -1255,7 +1259,7 @@
           if (state.history.battery.length > 60) state.history.battery.shift();
 
           batteryValue.textContent = bat.toFixed(2);
-          const voltage = 9.6 + (bat / 100) * 3.0;
+          const voltage = Number.isFinite(voltageDirect) ? voltageDirect : 9.6 + (bat / 100) * 3.0;
           batteryVoltageEst.textContent = "~ " + voltage.toFixed(2) + " V (LiPo 3S sim)";
           batteryBar.style.width = Math.max(0, Math.min(100, bat)) + "%";
 
@@ -1353,7 +1357,7 @@
         const d = envelope.data || {};
         state.currentState = d.state || state.currentState;
         state.previousState = d.previous_state || state.previousState;
-        state.stateReason = d.reason || state.stateReason;
+        state.stateReason = d.reason || (d.hardware_actuation === false ? "validação sem atuação física" : state.stateReason);
         state.motion = d.motion || "PARAR";
 
         currentStateText.textContent = state.currentState;
@@ -1374,10 +1378,15 @@
       function updateStatusUI(envelope) {
         const d = envelope.data || {};
         state.roverOnline = Boolean(d.online);
-        state.roverReason = d.reason || "";
+        state.roverReason = d.reason || d.mode || (d.hostname ? "host=" + d.hostname : "");
+        const simBadge = document.getElementById("simBadge");
+        if (simBadge) {
+          simBadge.textContent = envelope.simulated === false ? "PI 3 MQTT • SEM ATUAÇÃO FÍSICA" : "SIMULAÇÃO v1.0";
+        }
         if (state.roverOnline) {
           roverOnlineBadge.className = "badge badge-ok";
-          roverOnlineText.textContent = "ROVER: ONLINE (" + (envelope.source || "sim") + ")";
+          const hostInfo = d.hostname ? " • " + d.hostname : "";
+          roverOnlineText.textContent = "ROVER: ONLINE (" + (envelope.source || "sim") + hostInfo + ")";
         } else {
           roverOnlineBadge.className = "badge badge-danger";
           roverOnlineText.textContent = "ROVER: OFFLINE (" + (state.roverReason || "desconectado") + ")";
@@ -1389,8 +1398,9 @@
         const ok = Boolean(d.accepted);
         ackStatusBadge.className = ok ? "badge badge-ok" : "badge badge-danger";
         ackStatusBadge.textContent = ok ? "ACEITO (" + d.reason + ")" : "REJEITADO (" + d.reason + ")";
+        const topicOrExec = d.topic ? "Tópico: " + d.topic : "Execução: " + (d.execution || "simulated_only");
         ackDetails.textContent =
-          "Tópico: " + d.topic +
+          topicOrExec +
           " | Estado: " + d.state +
           (d.duplicate ? " (DUPLICATA)" : "") +
           (d.command_id ? " | ID: " + String(d.command_id).slice(0, 8) + "…" : "");

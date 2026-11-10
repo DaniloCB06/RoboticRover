@@ -1,1 +1,856 @@
-[{"id":"rover-tab","type":"tab","label":"RoboticRover • SIMULAÇÃO","disabled":false,"info":"Somente dados artificiais. UUID e TTL por comando. Heartbeat não retained a cada segundo. Parada MQTT não substitui emergência física."},{"id":"broker","type":"mqtt-broker","name":"Mosquitto (ambiente)","broker":"127.0.0.1","port":"1883","clientid":"station-nodered-01","autoConnect":true,"usetls":false,"protocolVersion":"5","keepalive":"5","cleansession":true,"autoUnsubscribe":true,"sessionExpiry":"0"},{"id":"dashboard-ws-server","type":"websocket-listener","path":"/ws/rover","wholemsg":"false"},{"id":"rx","type":"mqtt in","z":"rover-tab","name":"Rover → estação","topic":"rover/#","qos":"1","datatype":"utf8","broker":"broker","nl":false,"rap":true,"rh":0,"inputs":0,"x":140,"y":100,"wires":[["json"]]},{"id":"json","type":"json","z":"rover-tab","name":"Interpretar JSON","property":"payload","action":"obj","pretty":false,"x":360,"y":100,"wires":[["validate"]]},{"id":"validate","type":"function","z":"rover-tab","name":"Verificar envelope e tópico","func":"const types = {\"rover/estado\":\"state\",\"rover/telemetria\":\"telemetry\",\"rover/alarme\":\"alarm\",\"rover/log\":\"log\",\"rover/status\":\"status\",\"rover/cmd/ack\":\"ack\"};\nif (!types[msg.topic]) return null;\nconst p = msg.payload;\nif (!p || p.version !== \"1.0\" || p.simulated !== true || p.type !== types[msg.topic] ||\n    typeof p.source !== \"string\" || !p.source || !Number.isFinite(Date.parse(p.timestamp)) ||\n    !p.data || typeof p.data !== \"object\" || Array.isArray(p.data)) {\n    node.error(\"Envelope inválido recebido\", msg); return null;\n}\nreturn msg;","outputs":1,"noerr":0,"x":600,"y":100,"wires":[["route","dashboard-store"]]},{"id":"route","type":"switch","z":"rover-tab","name":"Tipo de mensagem","property":"topic","propertyType":"msg","rules":[{"t":"eq","v":"rover/estado","vt":"str"},{"t":"eq","v":"rover/telemetria","vt":"str"},{"t":"eq","v":"rover/alarme","vt":"str"},{"t":"eq","v":"rover/log","vt":"str"},{"t":"eq","v":"rover/status","vt":"str"},{"t":"eq","v":"rover/cmd/ack","vt":"str"}],"checkall":"true","repair":false,"outputs":6,"x":850,"y":100,"wires":[["debug-state"],["debug-telemetry"],["debug-alarm"],["debug-log"],["debug-status"],["debug-ack"]]},{"id":"catch","type":"catch","z":"rover-tab","name":"Erros do fluxo","scope":null,"uncaught":false,"x":150,"y":240,"wires":[["debug-errors"]]},{"id":"debug-errors","type":"debug","z":"rover-tab","name":"Erros / JSON inválido","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":430,"y":240,"wires":[]},{"id":"heartbeat-timer","type":"inject","z":"rover-tab","name":"Heartbeat 1 s (SIMULADO)","props":[{"p":"payload"}],"repeat":"10","crontab":"","once":true,"onceDelay":0.5,"topic":"","payload":"","payloadType":"date","x":180,"y":320,"wires":[["heartbeat"]]},{"id":"heartbeat","type":"function","z":"rover-tab","name":"Heartbeat fresco; sessão da estação","func":"function makeUUID() {\n  const c = global.get(\"crypto\");\n  if (c && typeof c.randomUUID === \"function\") return c.randomUUID();\n  return \"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx\".replace(/[xy]/g, function(ch) {\n    const r = (Math.random() * 16) | 0;\n    const v = ch === \"x\" ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\nlet session = context.get(\"session\");\nif (!session) { session = makeUUID(); context.set(\"session\", session); }\nmsg.topic = \"station/heartbeat\";\nmsg.qos = 1; msg.retain = false;\nmsg.payload = JSON.stringify({version:\"1.0\",timestamp:new Date().toISOString(),\n  source:env.get(\"STATION_SOURCE\") || \"station-nodered\",simulated:true,type:\"heartbeat\",\n  data:{online:true,session_id:session}});\nreturn msg;","outputs":1,"noerr":0,"x":510,"y":320,"wires":[["tx"]]},{"id":"command","type":"function","z":"rover-tab","name":"Comando: UUID + TTL 5 s","func":"function makeUUID() {\n  const c = global.get(\"crypto\");\n  if (c && typeof c.randomUUID === \"function\") return c.randomUUID();\n  return \"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx\".replace(/[xy]/g, function(ch) {\n    const r = (Math.random() * 16) | 0;\n    const v = ch === \"x\" ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\nconst now = Date.now();\nconst mode = msg.topic === \"rover/cmd/modo\";\nconst data = {command_id:makeUUID(),expires_at:new Date(now + 5000).toISOString()};\nif (mode) data.mode = msg.payload;\nelse {\n  data.action = msg.payload;\n  const dur = Number(msg.duration_ms);\n  data.duration_ms = Number.isInteger(dur) && dur >= 100 && dur <= 1000 ? dur : 500;\n}\nmsg.payload = JSON.stringify({version:\"1.0\",timestamp:new Date(now).toISOString(),\n  source:env.get(\"STATION_SOURCE\") || \"station-nodered\",simulated:true,\n  type:mode ? \"mode_command\":\"manual_command\",data});\nmsg.qos = 1; msg.retain = false;\nreturn msg;","outputs":1,"noerr":0,"x":520,"y":600,"wires":[["tx"]]},{"id":"tx","type":"mqtt out","z":"rover-tab","name":"Estação → Rover (nunca retained)","topic":"","qos":"1","retain":"false","respTopic":"","contentType":"application/json","userProps":"","correl":"","expiry":"5","broker":"broker","x":890,"y":400,"wires":[]},{"id":"comment-safety","type":"comment","z":"rover-tab","name":"SIMULAÇÃO • avance em sequência; PARAR sempre leva a SEGURO_ESPERA","info":"Heartbeat ausente por 4 s ou desconexão => estado seguro. Comandos de movimento só em CAPTURA_MANUAL; duração máxima 1 s. Dados artificiais. Emergência física e watchdog Arduino serão independentes.","x":440,"y":400,"wires":[]},{"id":"debug-state","type":"debug","z":"rover-tab","name":"SIMULADO · state","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":1110,"y":40,"wires":[]},{"id":"debug-telemetry","type":"debug","z":"rover-tab","name":"SIMULADO · telemetry","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":1110,"y":75,"wires":[]},{"id":"debug-alarm","type":"debug","z":"rover-tab","name":"SIMULADO · alarm","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":1110,"y":110,"wires":[]},{"id":"debug-log","type":"debug","z":"rover-tab","name":"SIMULADO · log","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":1110,"y":145,"wires":[]},{"id":"debug-status","type":"debug","z":"rover-tab","name":"SIMULADO · status","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":1110,"y":180,"wires":[]},{"id":"debug-ack","type":"debug","z":"rover-tab","name":"SIMULADO · ack","active":true,"tosidebar":true,"console":false,"tostatus":false,"complete":"true","targetType":"full","x":1110,"y":215,"wires":[]},{"id":"inject-busca","type":"inject","z":"rover-tab","name":"BUSCA (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/modo","payload":"BUSCA","payloadType":"str","x":180,"y":450,"wires":[["command"]]},{"id":"inject-aproximacao","type":"inject","z":"rover-tab","name":"APROXIMACAO (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/modo","payload":"APROXIMACAO","payloadType":"str","x":180,"y":500,"wires":[["command"]]},{"id":"inject-aguardando_pega","type":"inject","z":"rover-tab","name":"AGUARDANDO_PEGA (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/modo","payload":"AGUARDANDO_PEGA","payloadType":"str","x":180,"y":550,"wires":[["command"]]},{"id":"inject-captura_manual","type":"inject","z":"rover-tab","name":"CAPTURA_MANUAL (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/modo","payload":"CAPTURA_MANUAL","payloadType":"str","x":180,"y":600,"wires":[["command"]]},{"id":"inject-seguro_espera","type":"inject","z":"rover-tab","name":"SEGURO_ESPERA (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/modo","payload":"SEGURO_ESPERA","payloadType":"str","x":180,"y":650,"wires":[["command"]]},{"id":"inject-parar","type":"inject","z":"rover-tab","name":"PARAR (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/manual","payload":"PARAR","payloadType":"str","x":180,"y":700,"wires":[["command"]]},{"id":"inject-avancar","type":"inject","z":"rover-tab","name":"AVANCAR (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/manual","payload":"AVANCAR","payloadType":"str","x":180,"y":750,"wires":[["command"]]},{"id":"comment-dashboard","type":"comment","z":"rover-tab","name":"DASHBOARD DO OPERADOR • acesse http://127.0.0.1:1880/dashboard (Telemetria + Câmera WebRTC/MJPEG/HUD + Controle)","info":"Interface web servida em /dashboard com WebSocket em /ws/rover, snapshot em /api/rover/snapshot e comandos em /api/rover/command.","x":520,"y":840,"wires":[]},{"id":"dashboard-store","type":"function","z":"rover-tab","name":"Atualizar snapshot + WS","func":"const p = msg.payload;\nif (!p || typeof p !== \"object\") return null;\nconst snap = flow.get(\"rover_snapshot\") || {\n  telemetry: null, state: null, status: null, last_ack: null,\n  history: [], alarms: [], logs: []\n};\nif (p.type === \"telemetry\" && p.data) {\n  snap.telemetry = p;\n  snap.history.push({\n    timestamp: p.timestamp,\n    battery_percent: p.data.battery_percent,\n    temperature_c: p.data.temperature_c,\n    front: p.data.proximity_cm ? p.data.proximity_cm.front : null,\n    left: p.data.proximity_cm ? p.data.proximity_cm.left : null,\n    right: p.data.proximity_cm ? p.data.proximity_cm.right : null\n  });\n  if (snap.history.length > 60) snap.history.shift();\n} else if (p.type === \"state\") {\n  snap.state = p;\n} else if (p.type === \"status\") {\n  snap.status = p;\n} else if (p.type === \"ack\") {\n  snap.last_ack = p;\n} else if (p.type === \"alarm\") {\n  snap.alarms.unshift(p);\n  if (snap.alarms.length > 30) snap.alarms.pop();\n} else if (p.type === \"log\") {\n  snap.logs.unshift(p);\n  if (snap.logs.length > 40) snap.logs.pop();\n}\nflow.set(\"rover_snapshot\", snap);\nreturn { payload: JSON.stringify(p) };","outputs":1,"noerr":0,"x":860,"y":270,"wires":[["dashboard-ws-out"]]},{"id":"dashboard-ws-out","type":"websocket out","z":"rover-tab","name":"WS Out (/ws/rover)","server":"dashboard-ws-server","client":"","x":1120,"y":270,"wires":[]},{"id":"dashboard-ws-in","type":"websocket in","z":"rover-tab","name":"WS In (/ws/rover)","server":"dashboard-ws-server","client":"","x":160,"y":900,"wires":[["dashboard-ws-cmd"]]},{"id":"dashboard-ws-cmd","type":"function","z":"rover-tab","name":"Converter comando WS","func":"let body = msg.payload;\nif (typeof body === \"string\") {\n  try { body = JSON.parse(body); } catch (_) { return null; }\n}\nif (!body || typeof body !== \"object\") return null;\nconst modes = [\"SEGURO_ESPERA\",\"BUSCA\",\"APROXIMACAO\",\"AGUARDANDO_PEGA\",\"CAPTURA_MANUAL\"];\nconst actions = [\"PARAR\",\"AVANCAR\",\"RECUAR\",\"ESQUERDA\",\"DIREITA\"];\nif (body.kind === \"mode\" && modes.includes(body.mode)) {\n  return { topic: \"rover/cmd/modo\", payload: body.mode };\n}\nif (body.kind === \"manual\" && actions.includes(body.action)) {\n  const d = Number(body.duration_ms);\n  return {\n    topic: \"rover/cmd/manual\",\n    payload: body.action,\n    duration_ms: Number.isInteger(d) && d >= 100 && d <= 1000 ? d : 500\n  };\n}\nreturn null;","outputs":1,"noerr":0,"x":420,"y":900,"wires":[["command"]]},{"id":"dashboard-http-in","type":"http in","z":"rover-tab","name":"GET /dashboard","url":"/dashboard","method":"get","upload":false,"swaggerDoc":"","x":150,"y":960,"wires":[["dashboard-ui-template"]]},{"id":"dashboard-ui-template","type":"template","z":"rover-tab","name":"HTML Dashboard Operador","field":"payload","fieldType":"msg","format":"html","syntax":"plain","template":"<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>RoboticRover • Dashboard da Estação-Base</title>\n  <style>\n    :root {\n      --bg-base: #090d16;\n      --bg-panel: #111827;\n      --bg-card: #172033;\n      --bg-card-hover: #1e293b;\n      --border: #26334d;\n      --border-highlight: #3b82f6;\n      --text-main: #f1f5f9;\n      --text-muted: #94a3b8;\n      --text-dim: #64748b;\n      --accent: #38bdf8;\n      --accent-strong: #0284c7;\n      --ok: #10b981;\n      --ok-bg: rgba(16, 185, 129, 0.14);\n      --warn: #f59e0b;\n      --warn-bg: rgba(245, 158, 11, 0.14);\n      --danger: #ef4444;\n      --danger-bg: rgba(239, 68, 68, 0.16);\n      --radius: 10px;\n      --font-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Inter, sans-serif;\n      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Courier New\", monospace;\n    }\n\n    * {\n      box-sizing: border-box;\n      margin: 0;\n      padding: 0;\n    }\n\n    body {\n      background: radial-gradient(circle at top, #131c31 0%, var(--bg-base) 70%);\n      color: var(--text-main);\n      font-family: var(--font-sans);\n      min-height: 100vh;\n      line-height: 1.45;\n    }\n\n    /* Top Bar */\n    .topbar {\n      display: flex;\n      flex-wrap: wrap;\n      align-items: center;\n      justify-content: space-between;\n      gap: 12px;\n      padding: 12px 20px;\n      background: rgba(17, 24, 39, 0.92);\n      border-bottom: 1px solid var(--border);\n      position: sticky;\n      top: 0;\n      z-index: 50;\n      backdrop-filter: blur(10px);\n    }\n\n    .brand {\n      display: flex;\n      align-items: center;\n      gap: 12px;\n    }\n\n    .brand-icon {\n      width: 36px;\n      height: 36px;\n      border-radius: 8px;\n      background: linear-gradient(135deg, #0ea5e9, #2563eb);\n      display: grid;\n      place-items: center;\n      font-weight: 800;\n      font-family: var(--font-mono);\n      letter-spacing: -0.5px;\n      box-shadow: 0 0 16px rgba(14, 165, 233, 0.35);\n    }\n\n    .brand-title {\n      font-size: 1.05rem;\n      font-weight: 700;\n      letter-spacing: 0.3px;\n      display: flex;\n      align-items: center;\n      gap: 8px;\n    }\n\n    .brand-sub {\n      font-size: 0.76rem;\n      color: var(--text-muted);\n    }\n\n    .badge {\n      display: inline-flex;\n      align-items: center;\n      gap: 6px;\n      padding: 3px 9px;\n      border-radius: 999px;\n      font-size: 0.72rem;\n      font-weight: 600;\n      font-family: var(--font-mono);\n      border: 1px solid transparent;\n    }\n\n    .badge-sim {\n      background: rgba(56, 189, 248, 0.14);\n      color: var(--accent);\n      border-color: rgba(56, 189, 248, 0.35);\n    }\n\n    .badge-ok {\n      background: var(--ok-bg);\n      color: #34d399;\n      border-color: rgba(16, 185, 129, 0.35);\n    }\n\n    .badge-warn {\n      background: var(--warn-bg);\n      color: #fbbf24;\n      border-color: rgba(245, 158, 11, 0.35);\n    }\n\n    .badge-danger {\n      background: var(--danger-bg);\n      color: #f87171;\n      border-color: rgba(239, 68, 68, 0.4);\n    }\n\n    .dot {\n      width: 7px;\n      height: 7px;\n      border-radius: 50%;\n      background: currentColor;\n      display: inline-block;\n    }\n\n    .status-strip {\n      display: flex;\n      flex-wrap: wrap;\n      align-items: center;\n      gap: 10px;\n    }\n\n    .btn-emergency {\n      background: linear-gradient(135deg, #dc2626, #991b1b);\n      color: #fff;\n      border: 1px solid #f87171;\n      padding: 8px 16px;\n      border-radius: 8px;\n      font-weight: 700;\n      font-size: 0.82rem;\n      letter-spacing: 0.5px;\n      cursor: pointer;\n      box-shadow: 0 0 18px rgba(239, 68, 68, 0.4);\n      transition: transform 0.1s ease, box-shadow 0.15s ease;\n    }\n\n    .btn-emergency:hover {\n      box-shadow: 0 0 24px rgba(239, 68, 68, 0.7);\n      transform: translateY(-1px);\n    }\n\n    .btn-emergency:active {\n      transform: translateY(0);\n    }\n\n    /* Main Grid */\n    .container {\n      max-width: 1600px;\n      margin: 0 auto;\n      padding: 16px 20px 28px;\n      display: flex;\n      flex-direction: column;\n      gap: 16px;\n    }\n\n    .section-title {\n      font-size: 0.78rem;\n      text-transform: uppercase;\n      letter-spacing: 1px;\n      color: var(--text-muted);\n      font-weight: 700;\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      margin-bottom: 10px;\n    }\n\n    /* Telemetry Row */\n    .telemetry-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr 1.45fr;\n      gap: 16px;\n    }\n\n    @media (max-width: 1200px) {\n      .telemetry-grid {\n        grid-template-columns: 1fr 1fr;\n      }\n      .telemetry-grid > :last-child {\n        grid-column: span 2;\n      }\n    }\n\n    @media (max-width: 768px) {\n      .telemetry-grid {\n        grid-template-columns: 1fr;\n      }\n      .telemetry-grid > :last-child {\n        grid-column: span 1;\n      }\n    }\n\n    .panel {\n      background: var(--bg-panel);\n      border: 1px solid var(--border);\n      border-radius: var(--radius);\n      padding: 16px;\n      display: flex;\n      flex-direction: column;\n      gap: 12px;\n      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);\n    }\n\n    .metric-header {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n    }\n\n    .metric-label {\n      font-size: 0.84rem;\n      color: var(--text-muted);\n      font-weight: 600;\n    }\n\n    .metric-main {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      gap: 14px;\n    }\n\n    .metric-value {\n      font-size: 2.15rem;\n      font-weight: 800;\n      font-family: var(--font-mono);\n      letter-spacing: -1px;\n    }\n\n    .metric-unit {\n      font-size: 1rem;\n      color: var(--text-muted);\n      font-weight: 500;\n    }\n\n    .progress-track {\n      width: 100%;\n      height: 10px;\n      background: #0b111e;\n      border-radius: 999px;\n      overflow: hidden;\n      border: 1px solid var(--border);\n    }\n\n    .progress-fill {\n      height: 100%;\n      width: 0%;\n      background: linear-gradient(90deg, #10b981, #34d399);\n      border-radius: 999px;\n      transition: width 0.25s ease, background 0.25s ease;\n    }\n\n    .sparkline-box {\n      background: #0b111e;\n      border: 1px solid rgba(38, 51, 77, 0.7);\n      border-radius: 8px;\n      padding: 6px 8px;\n    }\n\n    .sparkline-canvas {\n      width: 100%;\n      height: 64px;\n      display: block;\n    }\n\n    .metric-stats {\n      display: flex;\n      justify-content: space-between;\n      font-size: 0.74rem;\n      color: var(--text-dim);\n      font-family: var(--font-mono);\n    }\n\n    /* Proximity Radar & Bars */\n    .proximity-layout {\n      display: grid;\n      grid-template-columns: 185px 1fr;\n      gap: 16px;\n      align-items: center;\n    }\n\n    @media (max-width: 560px) {\n      .proximity-layout {\n        grid-template-columns: 1fr;\n        justify-items: center;\n      }\n    }\n\n    .radar-wrap {\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 10px;\n      padding: 6px;\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n    }\n\n    .prox-bars {\n      display: flex;\n      flex-direction: column;\n      gap: 12px;\n      width: 100%;\n    }\n\n    .prox-item {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 9px 12px;\n      display: flex;\n      flex-direction: column;\n      gap: 6px;\n    }\n\n    .prox-row {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      font-size: 0.82rem;\n    }\n\n    .prox-val {\n      font-family: var(--font-mono);\n      font-weight: 700;\n      font-size: 0.96rem;\n    }\n\n    /* Middle Row: Camera + Controls */\n    .workspace-grid {\n      display: grid;\n      grid-template-columns: 1.35fr 1fr;\n      gap: 16px;\n    }\n\n    @media (max-width: 1100px) {\n      .workspace-grid {\n        grid-template-columns: 1fr;\n      }\n    }\n\n    /* Camera Viewport */\n    .cam-toolbar {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 8px;\n      align-items: center;\n      justify-content: space-between;\n    }\n\n    .tab-group {\n      display: inline-flex;\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 3px;\n      gap: 4px;\n    }\n\n    .tab-btn {\n      background: transparent;\n      color: var(--text-muted);\n      border: none;\n      padding: 6px 11px;\n      border-radius: 6px;\n      font-size: 0.78rem;\n      font-weight: 600;\n      cursor: pointer;\n      transition: all 0.15s ease;\n    }\n\n    .tab-btn.active {\n      background: var(--bg-card-hover);\n      color: var(--accent);\n      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);\n    }\n\n    .cam-config-bar {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 8px;\n      align-items: center;\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      padding: 8px 10px;\n      border-radius: 8px;\n    }\n\n    .cam-input {\n      flex: 1;\n      min-width: 210px;\n      background: #0b111e;\n      color: var(--text-main);\n      border: 1px solid var(--border);\n      border-radius: 6px;\n      padding: 6px 10px;\n      font-family: var(--font-mono);\n      font-size: 0.78rem;\n    }\n\n    .btn {\n      background: var(--bg-card-hover);\n      color: var(--text-main);\n      border: 1px solid var(--border);\n      padding: 6px 12px;\n      border-radius: 6px;\n      font-size: 0.78rem;\n      font-weight: 600;\n      cursor: pointer;\n      transition: all 0.15s ease;\n    }\n\n    .btn:hover:not(:disabled) {\n      border-color: var(--accent);\n      color: var(--accent);\n    }\n\n    .btn-primary {\n      background: var(--accent-strong);\n      border-color: var(--accent);\n      color: #fff;\n    }\n\n    .btn-primary:hover:not(:disabled) {\n      background: #0369a1;\n      color: #fff;\n    }\n\n    .cam-stage {\n      position: relative;\n      width: 100%;\n      aspect-ratio: 16 / 9;\n      background: #05080f;\n      border: 1px solid var(--border);\n      border-radius: 10px;\n      overflow: hidden;\n      display: grid;\n      place-items: center;\n    }\n\n    .cam-stage video,\n    .cam-stage img,\n    .cam-stage iframe,\n    .cam-stage canvas {\n      width: 100%;\n      height: 100%;\n      object-fit: cover;\n      display: block;\n    }\n\n    #camHudCanvas {\n      position: absolute;\n      inset: 0;\n      pointer-events: none;\n      z-index: 5;\n    }\n\n    .cam-info-note {\n      font-size: 0.75rem;\n      color: var(--text-muted);\n      background: rgba(15, 23, 42, 0.75);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 8px 12px;\n    }\n\n    .cam-info-note code {\n      color: var(--accent);\n      font-family: var(--font-mono);\n    }\n\n    /* State Machine & Manual Controls */\n    .state-banner {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 12px;\n      display: flex;\n      flex-wrap: wrap;\n      align-items: center;\n      justify-content: space-between;\n      gap: 10px;\n    }\n\n    .state-current {\n      font-family: var(--font-mono);\n      font-size: 1.25rem;\n      font-weight: 800;\n      color: var(--accent);\n    }\n\n    .state-meta {\n      font-size: 0.76rem;\n      color: var(--text-muted);\n      font-family: var(--font-mono);\n    }\n\n    .mode-pipeline {\n      display: grid;\n      grid-template-columns: repeat(5, 1fr);\n      gap: 8px;\n    }\n\n    @media (max-width: 680px) {\n      .mode-pipeline {\n        grid-template-columns: repeat(2, 1fr);\n      }\n    }\n\n    .mode-btn {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 10px 8px;\n      color: var(--text-main);\n      font-family: var(--font-mono);\n      font-size: 0.73rem;\n      font-weight: 700;\n      cursor: pointer;\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n      gap: 4px;\n      transition: all 0.15s ease;\n      text-align: center;\n    }\n\n    .mode-btn .step-tag {\n      font-size: 0.65rem;\n      color: var(--text-dim);\n      font-weight: 500;\n    }\n\n    .mode-btn.active-state {\n      border-color: var(--ok);\n      background: rgba(16, 185, 129, 0.14);\n      color: #34d399;\n      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);\n    }\n\n    .mode-btn.next-valid {\n      border-color: var(--accent);\n      background: rgba(56, 189, 248, 0.1);\n    }\n\n    .mode-btn:hover {\n      transform: translateY(-1px);\n      border-color: var(--accent);\n    }\n\n    /* Manual D-Pad */\n    .manual-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 14px;\n      align-items: center;\n    }\n\n    @media (max-width: 560px) {\n      .manual-grid {\n        grid-template-columns: 1fr;\n      }\n    }\n\n    .dpad {\n      display: grid;\n      grid-template-columns: repeat(3, 64px);\n      grid-template-rows: repeat(3, 52px);\n      gap: 8px;\n      justify-content: center;\n    }\n\n    .dpad-btn {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      color: var(--text-main);\n      font-family: var(--font-mono);\n      font-size: 0.72rem;\n      font-weight: 700;\n      cursor: pointer;\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n      justify-content: center;\n      gap: 2px;\n      user-select: none;\n      transition: all 0.1s ease;\n    }\n\n    .dpad-btn kbd {\n      font-size: 0.62rem;\n      color: var(--text-dim);\n    }\n\n    .dpad-btn:hover {\n      border-color: var(--accent);\n      background: var(--bg-card-hover);\n    }\n\n    .dpad-btn:active,\n    .dpad-btn.pressed {\n      background: var(--accent-strong);\n      border-color: var(--accent);\n      transform: scale(0.96);\n    }\n\n    .dpad-stop {\n      background: rgba(239, 68, 68, 0.18);\n      border-color: rgba(239, 68, 68, 0.5);\n      color: #fca5a5;\n    }\n\n    .manual-options {\n      display: flex;\n      flex-direction: column;\n      gap: 10px;\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 12px;\n      font-size: 0.78rem;\n    }\n\n    .ack-box {\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 10px 12px;\n      font-family: var(--font-mono);\n      font-size: 0.76rem;\n      display: flex;\n      flex-direction: column;\n      gap: 4px;\n    }\n\n    /* Bottom Feed */\n    .feed-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 16px;\n    }\n\n    @media (max-width: 960px) {\n      .feed-grid {\n        grid-template-columns: 1fr;\n      }\n    }\n\n    .event-list {\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      height: 190px;\n      overflow-y: auto;\n      padding: 8px;\n      font-family: var(--font-mono);\n      font-size: 0.74rem;\n      display: flex;\n      flex-direction: column;\n      gap: 6px;\n    }\n\n    .event-item {\n      padding: 6px 8px;\n      border-radius: 6px;\n      background: rgba(23, 32, 51, 0.7);\n      border-left: 3px solid var(--accent);\n      display: flex;\n      justify-content: space-between;\n      gap: 10px;\n    }\n\n    .event-item.warn {\n      border-left-color: var(--warn);\n    }\n\n    .event-item.error {\n      border-left-color: var(--danger);\n      background: rgba(239, 68, 68, 0.1);\n    }\n\n    .event-time {\n      color: var(--text-dim);\n      white-space: nowrap;\n    }\n  </style>\n</head>\n<body>\n  <!-- TOPBAR -->\n  <header class=\"topbar\">\n    <div class=\"brand\">\n      <div class=\"brand-icon\">RR</div>\n      <div>\n        <div class=\"brand-title\">\n          RoboticRover • Centro de Operações\n          <span class=\"badge badge-sim\" id=\"simBadge\">SIMULAÇÃO v1.0</span>\n        </div>\n        <div class=\"brand-sub\">Estação-Base Node-RED • Telemetria MQTT, Controle Operacional e Vídeo Híbrido</div>\n      </div>\n    </div>\n\n    <div class=\"status-strip\">\n      <span class=\"badge badge-warn\" id=\"wsBadge\">\n        <span class=\"dot\"></span>\n        <span id=\"wsText\">WS: Conectando...</span>\n      </span>\n      <span class=\"badge badge-danger\" id=\"roverOnlineBadge\">\n        <span class=\"dot\"></span>\n        <span id=\"roverOnlineText\">ROVER: Aguardando</span>\n      </span>\n      <span class=\"badge badge-sim\" id=\"lastSeenBadge\">Último pacote: --</span>\n      <button class=\"btn-emergency\" id=\"btnEmergencyTop\" type=\"button\" title=\"Atalho: Barra de Espaço ou Esc\">\n        PARADA DE EMERGÊNCIA (ESPAÇO)\n      </button>\n    </div>\n  </header>\n\n  <main class=\"container\">\n    <!-- TELEMETRY SECTION -->\n    <section>\n      <div class=\"section-title\">\n        <span>Telemetria em Tempo Real (`rover/telemetria`)</span>\n        <span id=\"telemetrySourceLabel\" style=\"font-family: var(--font-mono); font-size: 0.74rem;\">origem: --</span>\n      </div>\n\n      <div class=\"telemetry-grid\">\n        <!-- BATERIA -->\n        <div class=\"panel\">\n          <div class=\"metric-header\">\n            <span class=\"metric-label\">CARGA DA BATERIA</span>\n            <span class=\"badge badge-ok\" id=\"batteryBadge\">NOMINAL</span>\n          </div>\n          <div class=\"metric-main\">\n            <div>\n              <span class=\"metric-value\" id=\"batteryValue\">--.-</span>\n              <span class=\"metric-unit\">%</span>\n            </div>\n            <div style=\"text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);\">\n              <div id=\"batteryVoltageEst\">~ --.- V (LiPo 3S sim)</div>\n              <div id=\"batteryRateLabel\">Taxa: -0.002 %/amostra</div>\n            </div>\n          </div>\n          <div class=\"progress-track\">\n            <div class=\"progress-fill\" id=\"batteryBar\"></div>\n          </div>\n          <div class=\"sparkline-box\">\n            <canvas class=\"sparkline-canvas\" id=\"batterySparkline\" width=\"360\" height=\"64\"></canvas>\n          </div>\n          <div class=\"metric-stats\">\n            <span id=\"batteryMin\">Mín: --%</span>\n            <span id=\"batteryMax\">Máx: --%</span>\n            <span id=\"batterySamples\">Amostras: 0</span>\n          </div>\n        </div>\n\n        <!-- TEMPERATURA -->\n        <div class=\"panel\">\n          <div class=\"metric-header\">\n            <span class=\"metric-label\">TEMPERATURA INTERNA</span>\n            <span class=\"badge badge-ok\" id=\"tempBadge\">NORMAL</span>\n          </div>\n          <div class=\"metric-main\">\n            <div>\n              <span class=\"metric-value\" id=\"tempValue\">--.-</span>\n              <span class=\"metric-unit\">°C</span>\n            </div>\n            <div style=\"text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);\">\n              <div>Faixa operacional: 35–48 °C</div>\n              <div id=\"tempTrendLabel\">Tendência: estável</div>\n            </div>\n          </div>\n          <div class=\"progress-track\">\n            <div class=\"progress-fill\" id=\"tempBar\"></div>\n          </div>\n          <div class=\"sparkline-box\">\n            <canvas class=\"sparkline-canvas\" id=\"tempSparkline\" width=\"360\" height=\"64\"></canvas>\n          </div>\n          <div class=\"metric-stats\">\n            <span id=\"tempMin\">Mín: -- °C</span>\n            <span id=\"tempAvg\">Méd: -- °C</span>\n            <span id=\"tempMax\">Máx: -- °C</span>\n          </div>\n        </div>\n\n        <!-- SENSORES DE PROXIMIDADE -->\n        <div class=\"panel\">\n          <div class=\"metric-header\">\n            <span class=\"metric-label\">SENSORES DE PROXIMIDADE (FRENTE / ESQUERDA / DIREITA)</span>\n            <span class=\"badge badge-ok\" id=\"proxGlobalBadge\">CAMINHO LIVRE</span>\n          </div>\n\n          <div class=\"proximity-layout\">\n            <div class=\"radar-wrap\">\n              <canvas id=\"radarCanvas\" width=\"170\" height=\"150\"></canvas>\n              <span style=\"font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); margin-top: 2px;\">\n                RADAR 2D (0–200 cm)\n              </span>\n            </div>\n\n            <div class=\"prox-bars\">\n              <div class=\"prox-item\">\n                <div class=\"prox-row\">\n                  <span>▲ Frente (`front`)</span>\n                  <span class=\"prox-val\" id=\"proxFrontVal\">--.- cm</span>\n                </div>\n                <div class=\"progress-track\">\n                  <div class=\"progress-fill\" id=\"proxFrontBar\"></div>\n                </div>\n              </div>\n\n              <div class=\"prox-item\">\n                <div class=\"prox-row\">\n                  <span>◀ Esquerda (`left`)</span>\n                  <span class=\"prox-val\" id=\"proxLeftVal\">--.- cm</span>\n                </div>\n                <div class=\"progress-track\">\n                  <div class=\"progress-fill\" id=\"proxLeftBar\"></div>\n                </div>\n              </div>\n\n              <div class=\"prox-item\">\n                <div class=\"prox-row\">\n                  <span>▶ Direita (`right`)</span>\n                  <span class=\"prox-val\" id=\"proxRightVal\">--.- cm</span>\n                </div>\n                <div class=\"progress-track\">\n                  <div class=\"progress-fill\" id=\"proxRightBar\"></div>\n                </div>\n              </div>\n            </div>\n          </div>\n        </div>\n      </div>\n    </section>\n\n    <!-- CAMERA + CONTROLS -->\n    <section class=\"workspace-grid\">\n      <!-- HYBRID CAMERA PANEL -->\n      <div class=\"panel\">\n        <div class=\"cam-toolbar\">\n          <div class=\"metric-label\">CÂMERA DO ROVER (WEBRTC / MJPEG / SIMULADOR HUD)</div>\n          <div class=\"tab-group\" role=\"tablist\">\n            <button class=\"tab-btn active\" data-cam-mode=\"sim\" type=\"button\">Simulador HUD</button>\n            <button class=\"tab-btn\" data-cam-mode=\"webrtc\" type=\"button\">WebRTC (WHEP)</button>\n            <button class=\"tab-btn\" data-cam-mode=\"iframe\" type=\"button\">WebRTC (Player/Iframe)</button>\n            <button class=\"tab-btn\" data-cam-mode=\"mjpeg\" type=\"button\">MJPEG HTTP</button>\n          </div>\n        </div>\n\n        <div class=\"cam-config-bar\" id=\"camConfigBar\" style=\"display: none;\">\n          <span style=\"font-size: 0.76rem; color: var(--text-muted); font-weight: 600;\" id=\"camUrlLabel\">Endpoint:</span>\n          <input class=\"cam-input\" id=\"camUrlInput\" type=\"text\" placeholder=\"http://192.168.1.50:8889/rover/whep\" />\n          <button class=\"btn btn-primary\" id=\"btnCamConnect\" type=\"button\">Conectar</button>\n          <button class=\"btn\" id=\"btnCamDisconnect\" type=\"button\">Parar</button>\n          <label style=\"display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;\">\n            <input type=\"checkbox\" id=\"chkHudOverlay\" checked /> HUD\n          </label>\n        </div>\n\n        <div class=\"cam-stage\">\n          <video id=\"camVideo\" autoplay playsinline muted style=\"display: none;\"></video>\n          <img id=\"camMjpeg\" alt=\"Stream MJPEG do Rover\" style=\"display: none;\" />\n          <iframe id=\"camIframe\" title=\"Player WebRTC Embarcado\" style=\"display: none; border: none;\" allow=\"autoplay; fullscreen\"></iframe>\n          <canvas id=\"camHudCanvas\" width=\"768\" height=\"432\"></canvas>\n        </div>\n\n        <div class=\"cam-info-note\">\n          <strong>Protocolos de Câmera na Raspberry Pi 3:</strong>\n          Você provavelmente estava lembrando de <code>WebRTC</code> (via <strong>MediaMTX</strong>, <strong>go2rtc</strong> ou <strong>uStreamer WebRTC</strong> usando WHEP na porta <code>8889</code>) ou de <code>MJPEG sobre HTTP</code> (via <strong>uStreamer</strong> / <strong>mjpg-streamer</strong> na porta <code>8080</code>). Enquanto a câmera física não está conectada, o modo <strong>Simulador HUD</strong> renderiza a visão sintética sincronizada com os sensores e o estado atual do Rover.\n        </div>\n      </div>\n\n      <!-- STATE MACHINE & MANUAL CONTROLS -->\n      <div class=\"panel\">\n        <div class=\"section-title\" style=\"margin-bottom: 0;\">\n          <span>Máquina de Estados &amp; Navegação (`rover/estado`, `rover/cmd/*`)</span>\n          <span class=\"badge badge-sim\" id=\"motionBadge\">MOVIMENTO: PARAR</span>\n        </div>\n\n        <div class=\"state-banner\">\n          <div>\n            <div style=\"font-size: 0.72rem; color: var(--text-muted);\">ESTADO OPERACIONAL ATUAL</div>\n            <div class=\"state-current\" id=\"currentStateText\">SEGURO_ESPERA</div>\n          </div>\n          <div style=\"text-align: right;\">\n            <div class=\"state-meta\" id=\"prevStateText\">anterior: --</div>\n            <div class=\"state-meta\" id=\"stateReasonText\">motivo: inicializando</div>\n          </div>\n        </div>\n\n        <div style=\"font-size: 0.76rem; color: var(--text-muted);\">\n          Clique para comandar mudança de modo (o botão destacado em azul é o próximo passo válido da sequência):\n        </div>\n\n        <div class=\"mode-pipeline\">\n          <button class=\"mode-btn active-state\" data-mode=\"SEGURO_ESPERA\" type=\"button\">\n            <span class=\"step-tag\">0 • SEGURO</span>\n            <span>SEGURO_ESPERA</span>\n          </button>\n          <button class=\"mode-btn next-valid\" data-mode=\"BUSCA\" type=\"button\">\n            <span class=\"step-tag\">1 • INÍCIO</span>\n            <span>BUSCA</span>\n          </button>\n          <button class=\"mode-btn\" data-mode=\"APROXIMACAO\" type=\"button\">\n            <span class=\"step-tag\">2 • ALVO</span>\n            <span>APROXIMACAO</span>\n          </button>\n          <button class=\"mode-btn\" data-mode=\"AGUARDANDO_PEGA\" type=\"button\">\n            <span class=\"step-tag\">3 • POSIÇÃO</span>\n            <span>AGUARDANDO_PEGA</span>\n          </button>\n          <button class=\"mode-btn\" data-mode=\"CAPTURA_MANUAL\" type=\"button\">\n            <span class=\"step-tag\">4 • OPERADOR</span>\n            <span>CAPTURA_MANUAL</span>\n          </button>\n        </div>\n\n        <div class=\"manual-grid\">\n          <div class=\"dpad\">\n            <div></div>\n            <button class=\"dpad-btn\" data-action=\"AVANCAR\" type=\"button\">\n              <span>▲ AVANÇAR</span>\n              <kbd>W / ↑</kbd>\n            </button>\n            <div></div>\n\n            <button class=\"dpad-btn\" data-action=\"ESQUERDA\" type=\"button\">\n              <span>◀ ESQ</span>\n              <kbd>A / ←</kbd>\n            </button>\n            <button class=\"dpad-btn dpad-stop\" data-action=\"PARAR\" type=\"button\">\n              <span>■ PARAR</span>\n              <kbd>ESPAÇO</kbd>\n            </button>\n            <button class=\"dpad-btn\" data-action=\"DIREITA\" type=\"button\">\n              <span>DIR ▶</span>\n              <kbd>D / →</kbd>\n            </button>\n\n            <div></div>\n            <button class=\"dpad-btn\" data-action=\"RECUAR\" type=\"button\">\n              <span>▼ RECUAR</span>\n              <kbd>S / ↓</kbd>\n            </button>\n            <div></div>\n          </div>\n\n          <div class=\"manual-options\">\n            <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n              <span>Duração do pulso manual:</span>\n              <strong style=\"font-family: var(--font-mono); color: var(--accent);\" id=\"durationLabel\">500 ms</strong>\n            </div>\n            <input type=\"range\" id=\"durationSlider\" min=\"100\" max=\"1000\" step=\"50\" value=\"500\" />\n            <label style=\"display: flex; align-items: center; gap: 6px; cursor: pointer;\">\n              <input type=\"checkbox\" id=\"chkKeyboard\" checked />\n              Atalhos de teclado (WASD / Setas / Espaço)\n            </label>\n            <div style=\"font-size: 0.72rem; color: var(--text-dim);\">\n              Movimentos exigem <code>CAPTURA_MANUAL</code> e expiram localmente no Rover se não renovados. <code>PARAR</code> funciona em qualquer modo.\n            </div>\n          </div>\n        </div>\n\n        <div class=\"ack-box\" id=\"ackBox\">\n          <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n            <span style=\"color: var(--text-muted);\">ÚLTIMO ACK (`rover/cmd/ack`)</span>\n            <span class=\"badge badge-sim\" id=\"ackStatusBadge\">AGUARDANDO COMANDO</span>\n          </div>\n          <div id=\"ackDetails\" style=\"color: var(--text-main);\">Nenhum comando enviado nesta sessão.</div>\n        </div>\n      </div>\n    </section>\n\n    <!-- ALARMS & LOGS -->\n    <section class=\"feed-grid\">\n      <div class=\"panel\">\n        <div class=\"section-title\" style=\"margin-bottom: 0;\">\n          <span>Alarmes e Confirmações (`rover/alarme`, `rover/cmd/ack`)</span>\n          <button class=\"btn\" id=\"btnClearAlarms\" type=\"button\" style=\"padding: 2px 8px; font-size: 0.7rem;\">Limpar</button>\n        </div>\n        <div class=\"event-list\" id=\"alarmList\"></div>\n      </div>\n\n      <div class=\"panel\">\n        <div class=\"section-title\" style=\"margin-bottom: 0;\">\n          <span>Logs Operacionais (`rover/log`)</span>\n          <button class=\"btn\" id=\"btnClearLogs\" type=\"button\" style=\"padding: 2px 8px; font-size: 0.7rem;\">Limpar</button>\n        </div>\n        <div class=\"event-list\" id=\"logList\"></div>\n      </div>\n    </section>\n  </main>\n\n  <script>\n    (function () {\n      \"use strict\";\n\n      const VALID_NEXT = {\n        SEGURO_ESPERA: [\"BUSCA\"],\n        BUSCA: [\"APROXIMACAO\"],\n        APROXIMACAO: [\"AGUARDANDO_PEGA\"],\n        AGUARDANDO_PEGA: [\"CAPTURA_MANUAL\"],\n        CAPTURA_MANUAL: [\"BUSCA\"]\n      };\n\n      const state = {\n        wsConnected: false,\n        roverOnline: false,\n        roverReason: \"aguardando\",\n        source: \"--\",\n        lastPacketMs: null,\n        currentState: \"SEGURO_ESPERA\",\n        previousState: \"SEGURO_ESPERA\",\n        stateReason: \"inicializando\",\n        motion: \"PARAR\",\n        telemetry: {\n          battery_percent: null,\n          temperature_c: null,\n          proximity_cm: { front: null, left: null, right: null }\n        },\n        history: {\n          battery: [],\n          temperature: []\n        },\n        camMode: \"sim\",\n        webrtcPc: null,\n        simTick: 0\n      };\n\n      // DOM elements\n      const wsBadge = document.getElementById(\"wsBadge\");\n      const wsText = document.getElementById(\"wsText\");\n      const roverOnlineBadge = document.getElementById(\"roverOnlineBadge\");\n      const roverOnlineText = document.getElementById(\"roverOnlineText\");\n      const lastSeenBadge = document.getElementById(\"lastSeenBadge\");\n      const telemetrySourceLabel = document.getElementById(\"telemetrySourceLabel\");\n\n      const batteryValue = document.getElementById(\"batteryValue\");\n      const batteryBadge = document.getElementById(\"batteryBadge\");\n      const batteryVoltageEst = document.getElementById(\"batteryVoltageEst\");\n      const batteryBar = document.getElementById(\"batteryBar\");\n      const batteryMin = document.getElementById(\"batteryMin\");\n      const batteryMax = document.getElementById(\"batteryMax\");\n      const batterySamples = document.getElementById(\"batterySamples\");\n      const batterySparkline = document.getElementById(\"batterySparkline\");\n\n      const tempValue = document.getElementById(\"tempValue\");\n      const tempBadge = document.getElementById(\"tempBadge\");\n      const tempTrendLabel = document.getElementById(\"tempTrendLabel\");\n      const tempBar = document.getElementById(\"tempBar\");\n      const tempMin = document.getElementById(\"tempMin\");\n      const tempAvg = document.getElementById(\"tempAvg\");\n      const tempMax = document.getElementById(\"tempMax\");\n      const tempSparkline = document.getElementById(\"tempSparkline\");\n\n      const proxGlobalBadge = document.getElementById(\"proxGlobalBadge\");\n      const proxFrontVal = document.getElementById(\"proxFrontVal\");\n      const proxLeftVal = document.getElementById(\"proxLeftVal\");\n      const proxRightVal = document.getElementById(\"proxRightVal\");\n      const proxFrontBar = document.getElementById(\"proxFrontBar\");\n      const proxLeftBar = document.getElementById(\"proxLeftBar\");\n      const proxRightBar = document.getElementById(\"proxRightBar\");\n      const radarCanvas = document.getElementById(\"radarCanvas\");\n\n      const currentStateText = document.getElementById(\"currentStateText\");\n      const prevStateText = document.getElementById(\"prevStateText\");\n      const stateReasonText = document.getElementById(\"stateReasonText\");\n      const motionBadge = document.getElementById(\"motionBadge\");\n      const ackStatusBadge = document.getElementById(\"ackStatusBadge\");\n      const ackDetails = document.getElementById(\"ackDetails\");\n\n      const alarmList = document.getElementById(\"alarmList\");\n      const logList = document.getElementById(\"logList\");\n\n      const durationSlider = document.getElementById(\"durationSlider\");\n      const durationLabel = document.getElementById(\"durationLabel\");\n      const chkKeyboard = document.getElementById(\"chkKeyboard\");\n\n      const camConfigBar = document.getElementById(\"camConfigBar\");\n      const camUrlLabel = document.getElementById(\"camUrlLabel\");\n      const camUrlInput = document.getElementById(\"camUrlInput\");\n      const camVideo = document.getElementById(\"camVideo\");\n      const camMjpeg = document.getElementById(\"camMjpeg\");\n      const camIframe = document.getElementById(\"camIframe\");\n      const camHudCanvas = document.getElementById(\"camHudCanvas\");\n      const chkHudOverlay = document.getElementById(\"chkHudOverlay\");\n\n      function formatTime(iso) {\n        if (!iso) return new Date().toLocaleTimeString(\"pt-BR\");\n        const d = new Date(iso);\n        return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleTimeString(\"pt-BR\");\n      }\n\n      function pushEvent(container, text, level, isoTime) {\n        const div = document.createElement(\"div\");\n        div.className = \"event-item\" + (level === \"warn\" ? \" warn\" : level === \"error\" ? \" error\" : \"\");\n        const msgSpan = document.createElement(\"span\");\n        msgSpan.textContent = text;\n        const timeSpan = document.createElement(\"span\");\n        timeSpan.className = \"event-time\";\n        timeSpan.textContent = formatTime(isoTime);\n        div.appendChild(msgSpan);\n        div.appendChild(timeSpan);\n        container.prepend(div);\n        while (container.children.length > 40) {\n          container.removeChild(container.lastChild);\n        }\n      }\n\n      function drawSparkline(canvas, values, strokeColor, fillColor, minRef, maxRef) {\n        const ctx = canvas.getContext(\"2d\");\n        const w = canvas.width;\n        const h = canvas.height;\n        ctx.clearRect(0, 0, w, h);\n\n        // Grid lines\n        ctx.strokeStyle = \"rgba(148, 163, 184, 0.12)\";\n        ctx.lineWidth = 1;\n        for (let i = 1; i <= 2; i++) {\n          const y = (h / 3) * i;\n          ctx.beginPath();\n          ctx.moveTo(0, y);\n          ctx.lineTo(w, y);\n          ctx.stroke();\n        }\n\n        if (!values || values.length === 0) return;\n\n        const minVal = minRef !== undefined ? Math.min(minRef, ...values) : Math.min(...values) - 0.5;\n        const maxVal = maxRef !== undefined ? Math.max(maxRef, ...values) : Math.max(...values) + 0.5;\n        const span = Math.max(0.01, maxVal - minVal);\n\n        const pts = values.map((v, idx) => {\n          const x = values.length === 1 ? w / 2 : (idx / (values.length - 1)) * (w - 8) + 4;\n          const y = h - 6 - ((v - minVal) / span) * (h - 12);\n          return [x, y];\n        });\n\n        ctx.beginPath();\n        pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));\n        ctx.strokeStyle = strokeColor;\n        ctx.lineWidth = 2;\n        ctx.stroke();\n\n        ctx.lineTo(pts[pts.length - 1][0], h);\n        ctx.lineTo(pts[0][0], h);\n        ctx.closePath();\n        ctx.fillStyle = fillColor;\n        ctx.fill();\n      }\n\n      function proxColor(cm) {\n        if (!Number.isFinite(cm)) return \"#38bdf8\";\n        if (cm < 50) return \"#ef4444\";\n        if (cm < 100) return \"#f59e0b\";\n        return \"#10b981\";\n      }\n\n      function drawRadar() {\n        const ctx = radarCanvas.getContext(\"2d\");\n        const w = radarCanvas.width;\n        const h = radarCanvas.height;\n        const cx = w / 2;\n        const cy = h - 24;\n        const maxR = 110;\n\n        ctx.clearRect(0, 0, w, h);\n\n        // Concentric range arcs (50, 100, 150, 200 cm)\n        ctx.strokeStyle = \"rgba(56, 189, 248, 0.18)\";\n        ctx.lineWidth = 1;\n        [0.25, 0.5, 0.75, 1.0].forEach((ratio) => {\n          ctx.beginPath();\n          ctx.arc(cx, cy, maxR * ratio, Math.PI, 0, false);\n          ctx.stroke();\n        });\n\n        // Crosshairs\n        ctx.beginPath();\n        ctx.moveTo(cx - maxR, cy);\n        ctx.lineTo(cx + maxR, cy);\n        ctx.moveTo(cx, cy);\n        ctx.lineTo(cx, cy - maxR);\n        ctx.stroke();\n\n        const p = state.telemetry.proximity_cm || {};\n        const sectors = [\n          { val: p.front, start: -Math.PI * 0.65, end: -Math.PI * 0.35 },\n          { val: p.left, start: -Math.PI * 0.98, end: -Math.PI * 0.72 },\n          { val: p.right, start: -Math.PI * 0.28, end: -Math.PI * 0.02 }\n        ];\n\n        sectors.forEach((s) => {\n          if (!Number.isFinite(s.val)) return;\n          const clamped = Math.max(10, Math.min(200, s.val));\n          const r = (clamped / 200) * maxR;\n          const color = proxColor(s.val);\n\n          ctx.beginPath();\n          ctx.moveTo(cx, cy);\n          ctx.arc(cx, cy, r, s.start, s.end, false);\n          ctx.closePath();\n          ctx.fillStyle = color + \"28\";\n          ctx.fill();\n\n          ctx.beginPath();\n          ctx.arc(cx, cy, r, s.start, s.end, false);\n          ctx.strokeStyle = color;\n          ctx.lineWidth = 3.5;\n          ctx.stroke();\n        });\n\n        // Rover body\n        ctx.fillStyle = \"#38bdf8\";\n        ctx.fillRect(cx - 8, cy - 10, 16, 20);\n        ctx.strokeStyle = \"#0284c7\";\n        ctx.strokeRect(cx - 8, cy - 10, 16, 20);\n      }\n\n      function updateTelemetryUI(envelope) {\n        const d = envelope.data || {};\n        state.source = envelope.source || state.source;\n        telemetrySourceLabel.textContent = \"origem: \" + state.source + \" • \" + formatTime(envelope.timestamp);\n\n        const bat = Number(d.battery_percent);\n        const temp = Number(d.temperature_c);\n        const prox = d.proximity_cm || {};\n\n        if (Number.isFinite(bat)) {\n          state.telemetry.battery_percent = bat;\n          state.history.battery.push(bat);\n          if (state.history.battery.length > 60) state.history.battery.shift();\n\n          batteryValue.textContent = bat.toFixed(2);\n          const voltage = 9.6 + (bat / 100) * 3.0;\n          batteryVoltageEst.textContent = \"~ \" + voltage.toFixed(2) + \" V (LiPo 3S sim)\";\n          batteryBar.style.width = Math.max(0, Math.min(100, bat)) + \"%\";\n\n          if (bat < 20) {\n            batteryBadge.className = \"badge badge-danger\";\n            batteryBadge.textContent = \"CRÍTICA\";\n            batteryBar.style.background = \"#ef4444\";\n          } else if (bat < 50) {\n            batteryBadge.className = \"badge badge-warn\";\n            batteryBadge.textContent = \"ATENÇÃO\";\n            batteryBar.style.background = \"#f59e0b\";\n          } else {\n            batteryBadge.className = \"badge badge-ok\";\n            batteryBadge.textContent = \"NOMINAL\";\n            batteryBar.style.background = \"linear-gradient(90deg, #10b981, #34d399)\";\n          }\n\n          const bArr = state.history.battery;\n          batteryMin.textContent = \"Mín: \" + Math.min(...bArr).toFixed(2) + \"%\";\n          batteryMax.textContent = \"Máx: \" + Math.max(...bArr).toFixed(2) + \"%\";\n          batterySamples.textContent = \"Amostras: \" + bArr.length;\n          drawSparkline(batterySparkline, bArr, \"#10b981\", \"rgba(16, 185, 129, 0.16)\");\n        }\n\n        if (Number.isFinite(temp)) {\n          state.telemetry.temperature_c = temp;\n          state.history.temperature.push(temp);\n          if (state.history.temperature.length > 60) state.history.temperature.shift();\n\n          tempValue.textContent = temp.toFixed(1);\n          const pct = Math.max(0, Math.min(100, ((temp - 20) / 40) * 100));\n          tempBar.style.width = pct + \"%\";\n\n          if (temp >= 47.5) {\n            tempBadge.className = \"badge badge-danger\";\n            tempBadge.textContent = \"ALTA\";\n            tempBar.style.background = \"#ef4444\";\n          } else if (temp >= 45.0) {\n            tempBadge.className = \"badge badge-warn\";\n            tempBadge.textContent = \"ELEVADA\";\n            tempBar.style.background = \"#f59e0b\";\n          } else {\n            tempBadge.className = \"badge badge-ok\";\n            tempBadge.textContent = \"NORMAL\";\n            tempBar.style.background = \"linear-gradient(90deg, #38bdf8, #10b981)\";\n          }\n\n          const tArr = state.history.temperature;\n          const avg = tArr.reduce((a, b) => a + b, 0) / tArr.length;\n          tempMin.textContent = \"Mín: \" + Math.min(...tArr).toFixed(1) + \" °C\";\n          tempAvg.textContent = \"Méd: \" + avg.toFixed(1) + \" °C\";\n          tempMax.textContent = \"Máx: \" + Math.max(...tArr).toFixed(1) + \" °C\";\n          tempTrendLabel.textContent = \"Média recente: \" + avg.toFixed(1) + \" °C\";\n          drawSparkline(tempSparkline, tArr, \"#38bdf8\", \"rgba(56, 189, 248, 0.16)\", 36, 50);\n        }\n\n        const f = Number(prox.front);\n        const l = Number(prox.left);\n        const r = Number(prox.right);\n        state.telemetry.proximity_cm = { front: f, left: l, right: r };\n\n        const updateProxBar = (valEl, barEl, val) => {\n          if (!Number.isFinite(val)) return;\n          valEl.textContent = val.toFixed(1) + \" cm\";\n          valEl.style.color = proxColor(val);\n          barEl.style.width = Math.max(2, Math.min(100, (val / 200) * 100)) + \"%\";\n          barEl.style.background = proxColor(val);\n        };\n\n        updateProxBar(proxFrontVal, proxFrontBar, f);\n        updateProxBar(proxLeftVal, proxLeftBar, l);\n        updateProxBar(proxRightVal, proxRightBar, r);\n\n        const minProx = Math.min(\n          Number.isFinite(f) ? f : 999,\n          Number.isFinite(l) ? l : 999,\n          Number.isFinite(r) ? r : 999\n        );\n\n        if (minProx < 50) {\n          proxGlobalBadge.className = \"badge badge-danger\";\n          proxGlobalBadge.textContent = \"OBSTÁCULO PRÓXIMO (<50cm)\";\n        } else if (minProx < 100) {\n          proxGlobalBadge.className = \"badge badge-warn\";\n          proxGlobalBadge.textContent = \"ATENÇÃO (50–100cm)\";\n        } else {\n          proxGlobalBadge.className = \"badge badge-ok\";\n          proxGlobalBadge.textContent = \"CAMINHO LIVRE\";\n        }\n\n        drawRadar();\n      }\n\n      function updateStateUI(envelope) {\n        const d = envelope.data || {};\n        state.currentState = d.state || state.currentState;\n        state.previousState = d.previous_state || state.previousState;\n        state.stateReason = d.reason || state.stateReason;\n        state.motion = d.motion || \"PARAR\";\n\n        currentStateText.textContent = state.currentState;\n        prevStateText.textContent = \"anterior: \" + state.previousState;\n        stateReasonText.textContent = \"motivo: \" + state.stateReason;\n\n        motionBadge.textContent = \"MOVIMENTO: \" + state.motion;\n        motionBadge.className = state.motion === \"PARAR\" ? \"badge badge-sim\" : \"badge badge-warn\";\n\n        const nextValid = VALID_NEXT[state.currentState] || [];\n        document.querySelectorAll(\".mode-btn\").forEach((btn) => {\n          const m = btn.getAttribute(\"data-mode\");\n          btn.classList.toggle(\"active-state\", m === state.currentState);\n          btn.classList.toggle(\"next-valid\", m !== state.currentState && nextValid.includes(m));\n        });\n      }\n\n      function updateStatusUI(envelope) {\n        const d = envelope.data || {};\n        state.roverOnline = Boolean(d.online);\n        state.roverReason = d.reason || \"\";\n        if (state.roverOnline) {\n          roverOnlineBadge.className = \"badge badge-ok\";\n          roverOnlineText.textContent = \"ROVER: ONLINE (\" + (envelope.source || \"sim\") + \")\";\n        } else {\n          roverOnlineBadge.className = \"badge badge-danger\";\n          roverOnlineText.textContent = \"ROVER: OFFLINE (\" + (state.roverReason || \"desconectado\") + \")\";\n        }\n      }\n\n      function updateAckUI(envelope) {\n        const d = envelope.data || {};\n        const ok = Boolean(d.accepted);\n        ackStatusBadge.className = ok ? \"badge badge-ok\" : \"badge badge-danger\";\n        ackStatusBadge.textContent = ok ? \"ACEITO (\" + d.reason + \")\" : \"REJEITADO (\" + d.reason + \")\";\n        ackDetails.textContent =\n          \"Tópico: \" + d.topic +\n          \" | Estado: \" + d.state +\n          (d.duplicate ? \" (DUPLICATA)\" : \"\") +\n          (d.command_id ? \" | ID: \" + String(d.command_id).slice(0, 8) + \"…\" : \"\");\n\n        pushEvent(\n          alarmList,\n          \"[ACK] \" + (ok ? \"ACEITO\" : \"REJEITADO\") + \" • \" + d.reason + \" → estado=\" + d.state,\n          ok ? \"info\" : \"warn\",\n          envelope.timestamp\n        );\n      }\n\n      function handleEnvelope(envelope) {\n        if (!envelope || typeof envelope !== \"object\") return;\n        state.lastPacketMs = Date.now();\n\n        switch (envelope.type) {\n          case \"telemetry\":\n            updateTelemetryUI(envelope);\n            break;\n          case \"state\":\n            updateStateUI(envelope);\n            break;\n          case \"status\":\n            updateStatusUI(envelope);\n            break;\n          case \"ack\":\n            updateAckUI(envelope);\n            break;\n          case \"alarm\": {\n            const d = envelope.data || {};\n            pushEvent(\n              alarmList,\n              \"[ALARME • \" + (d.code || \"ALERTA\") + \"] \" + (d.message || \"\"),\n              d.severity === \"critical\" ? \"error\" : \"warn\",\n              envelope.timestamp\n            );\n            break;\n          }\n          case \"log\": {\n            const d = envelope.data || {};\n            pushEvent(\n              logList,\n              \"[\" + (d.level || \"INFO\") + \" • \" + (d.event || \"log\") + \"] \" + (d.message || \"\"),\n              d.level === \"ERROR\" ? \"error\" : d.level === \"WARNING\" ? \"warn\" : \"info\",\n              envelope.timestamp\n            );\n            break;\n          }\n        }\n      }\n\n      // Send Command via WebSocket or HTTP fallback\n      let ws = null;\n\n      function sendCommand(payloadObj) {\n        if (ws && ws.readyState === WebSocket.OPEN) {\n          ws.send(JSON.stringify(payloadObj));\n          return;\n        }\n        fetch(\"/api/rover/command\", {\n          method: \"POST\",\n          headers: { \"Content-Type\": \"application/json\" },\n          body: JSON.stringify(payloadObj)\n        }).catch((err) => {\n          console.error(\"Falha ao enviar comando HTTP:\", err);\n        });\n      }\n\n      function sendMode(mode) {\n        sendCommand({ kind: \"mode\", mode: mode });\n      }\n\n      function sendManual(action) {\n        const duration = parseInt(durationSlider.value, 10) || 500;\n        sendCommand({ kind: \"manual\", action: action, duration_ms: duration });\n      }\n\n      // Connect WebSocket & fetch initial snapshot\n      function loadSnapshot() {\n        fetch(\"/api/rover/snapshot\")\n          .then((r) => (r.ok ? r.json() : null))\n          .then((snap) => {\n            if (!snap) return;\n            if (Array.isArray(snap.history)) {\n              state.history.battery = snap.history\n                .map((h) => Number(h.battery_percent))\n                .filter(Number.isFinite);\n              state.history.temperature = snap.history\n                .map((h) => Number(h.temperature_c))\n                .filter(Number.isFinite);\n            }\n            if (snap.status) handleEnvelope(snap.status);\n            if (snap.state) handleEnvelope(snap.state);\n            if (snap.telemetry) handleEnvelope(snap.telemetry);\n            if (snap.last_ack) updateAckUI(snap.last_ack);\n            if (Array.isArray(snap.alarms)) {\n              snap.alarms.slice().reverse().forEach(handleEnvelope);\n            }\n            if (Array.isArray(snap.logs)) {\n              snap.logs.slice().reverse().forEach(handleEnvelope);\n            }\n          })\n          .catch(() => {});\n      }\n\n      function connectWebSocket() {\n        const proto = window.location.protocol === \"https:\" ? \"wss:\" : \"ws:\";\n        const url = proto + \"//\" + window.location.host + \"/ws/rover\";\n        ws = new WebSocket(url);\n\n        ws.onopen = function () {\n          state.wsConnected = true;\n          wsBadge.className = \"badge badge-ok\";\n          wsText.textContent = \"WS: Conectado\";\n          loadSnapshot();\n        };\n\n        ws.onmessage = function (ev) {\n          try {\n            const msg = JSON.parse(ev.data);\n            handleEnvelope(msg);\n          } catch (_) {}\n        };\n\n        ws.onclose = function () {\n          state.wsConnected = false;\n          wsBadge.className = \"badge badge-warn\";\n          wsText.textContent = \"WS: Reconectando...\";\n          setTimeout(connectWebSocket, 1500);\n        };\n\n        ws.onerror = function () {\n          try {\n            ws.close();\n          } catch (_) {}\n        };\n      }\n\n      // Hybrid Camera Controller (Sim HUD + WebRTC WHEP + WebRTC Iframe + MJPEG)\n      function stopRealStreams() {\n        if (state.webrtcPc) {\n          try {\n            state.webrtcPc.close();\n          } catch (_) {}\n          state.webrtcPc = null;\n        }\n        camVideo.srcObject = null;\n        camVideo.style.display = \"none\";\n        camMjpeg.removeAttribute(\"src\");\n        camMjpeg.style.display = \"none\";\n        camIframe.src = \"about:blank\";\n        camIframe.style.display = \"none\";\n      }\n\n      async function connectWebRtcWhep(whepUrl) {\n        stopRealStreams();\n        camVideo.style.display = \"block\";\n        try {\n          const pc = new RTCPeerConnection({\n            iceServers: [{ urls: \"stun:stun.l.google.com:19302\" }]\n          });\n          state.webrtcPc = pc;\n          pc.addTransceiver(\"video\", { direction: \"recvonly\" });\n          pc.ontrack = (event) => {\n            if (event.streams && event.streams[0]) {\n              camVideo.srcObject = event.streams[0];\n            }\n          };\n          const offer = await pc.createOffer();\n          await pc.setLocalDescription(offer);\n\n          const res = await fetch(whepUrl, {\n            method: \"POST\",\n            headers: { \"Content-Type\": \"application/sdp\" },\n            body: pc.localDescription.sdp\n          });\n          if (!res.ok) throw new Error(\"HTTP \" + res.status);\n          const answerSdp = await res.text();\n          await pc.setRemoteDescription({ type: \"answer\", sdp: answerSdp });\n          pushEvent(logList, \"[CAMERA] WebRTC WHEP conectado em \" + whepUrl, \"info\");\n        } catch (err) {\n          pushEvent(\n            alarmList,\n            \"[CAMERA] Falha ao negociar WebRTC WHEP (\" + err.message + \"). Verifique se MediaMTX/go2rtc está ativo.\",\n            \"warn\"\n          );\n        }\n      }\n\n      function setCameraMode(mode) {\n        state.camMode = mode;\n        document.querySelectorAll(\"[data-cam-mode]\").forEach((b) => {\n          b.classList.toggle(\"active\", b.getAttribute(\"data-cam-mode\") === mode);\n        });\n\n        stopRealStreams();\n\n        if (mode === \"sim\") {\n          camConfigBar.style.display = \"none\";\n          camHudCanvas.style.display = \"block\";\n        } else {\n          camConfigBar.style.display = \"flex\";\n          camHudCanvas.style.display = chkHudOverlay.checked ? \"block\" : \"none\";\n          const saved = localStorage.getItem(\"rover_cam_url_\" + mode);\n          if (mode === \"webrtc\") {\n            camUrlLabel.textContent = \"Endpoint WHEP:\";\n            camUrlInput.value = saved || \"http://192.168.1.50:8889/rover/whep\";\n          } else if (mode === \"iframe\") {\n            camUrlLabel.textContent = \"URL Player WebRTC:\";\n            camUrlInput.value = saved || \"http://192.168.1.50:8889/rover\";\n          } else if (mode === \"mjpeg\") {\n            camUrlLabel.textContent = \"URL Stream MJPEG:\";\n            camUrlInput.value = saved || \"http://192.168.1.50:8080/?action=stream\";\n          }\n        }\n      }\n\n      document.querySelectorAll(\"[data-cam-mode]\").forEach((btn) => {\n        btn.addEventListener(\"click\", () => setCameraMode(btn.getAttribute(\"data-cam-mode\")));\n      });\n\n      document.getElementById(\"btnCamConnect\").addEventListener(\"click\", () => {\n        const url = camUrlInput.value.trim();\n        if (!url) return;\n        localStorage.setItem(\"rover_cam_url_\" + state.camMode, url);\n        if (state.camMode === \"webrtc\") {\n          connectWebRtcWhep(url);\n        } else if (state.camMode === \"iframe\") {\n          stopRealStreams();\n          camIframe.style.display = \"block\";\n          camIframe.src = url;\n        } else if (state.camMode === \"mjpeg\") {\n          stopRealStreams();\n          camMjpeg.style.display = \"block\";\n          camMjpeg.src = url;\n        }\n      });\n\n      document.getElementById(\"btnCamDisconnect\").addEventListener(\"click\", stopRealStreams);\n\n      chkHudOverlay.addEventListener(\"change\", () => {\n        if (state.camMode !== \"sim\") {\n          camHudCanvas.style.display = chkHudOverlay.checked ? \"block\" : \"none\";\n        }\n      });\n\n      // Render Simulated Camera & Tactical HUD Overlay\n      function renderCameraHud() {\n        const ctx = camHudCanvas.getContext(\"2d\");\n        const w = camHudCanvas.width;\n        const h = camHudCanvas.height;\n        ctx.clearRect(0, 0, w, h);\n\n        if (state.motion === \"AVANCAR\") state.simTick += 2.2;\n        else if (state.motion === \"RECUAR\") state.simTick -= 2.2;\n        else if (state.state !== \"SEGURO_ESPERA\") state.simTick += 0.45;\n\n        // Synthetic background when in Simulator mode\n        if (state.camMode === \"sim\") {\n          const sky = ctx.createLinearGradient(0, 0, 0, h * 0.52);\n          sky.addColorStop(0, \"#060b16\");\n          sky.addColorStop(1, \"#0f1e36\");\n          ctx.fillStyle = sky;\n          ctx.fillRect(0, 0, w, h * 0.52);\n\n          const ground = ctx.createLinearGradient(0, h * 0.52, 0, h);\n          ground.addColorStop(0, \"#0b1526\");\n          ground.addColorStop(1, \"#050911\");\n          ctx.fillStyle = ground;\n          ctx.fillRect(0, h * 0.52, w, h * 0.48);\n\n          // Perspective grid\n          const horizon = h * 0.52;\n          ctx.strokeStyle = \"rgba(56, 189, 248, 0.2)\";\n          ctx.lineWidth = 1;\n          for (let i = -8; i <= 8; i++) {\n            ctx.beginPath();\n            ctx.moveTo(w / 2 + i * 18, horizon);\n            ctx.lineTo(w / 2 + i * 120, h);\n            ctx.stroke();\n          }\n\n          const offset = ((state.simTick % 20) + 20) % 20;\n          for (let d = 1; d <= 7; d++) {\n            const norm = (d * 20 - offset) / 140;\n            const y = horizon + Math.pow(norm, 1.5) * (h - horizon);\n            ctx.beginPath();\n            ctx.moveTo(0, y);\n            ctx.lineTo(w, y);\n            ctx.stroke();\n          }\n\n          // Simulated target box based on state machine\n          if (state.currentState !== \"SEGURO_ESPERA\") {\n            const boxSize =\n              state.currentState === \"BUSCA\"\n                ? 70\n                : state.currentState === \"APROXIMACAO\"\n                ? 115\n                : 150;\n            const wobble =\n              state.currentState === \"BUSCA\" ? Math.sin(Date.now() / 600) * 90 : 0;\n            const bx = w / 2 - boxSize / 2 + wobble;\n            const by = horizon - boxSize * 0.35;\n\n            ctx.strokeStyle =\n              state.currentState === \"CAPTURA_MANUAL\" ? \"#10b981\" : \"#f59e0b\";\n            ctx.lineWidth = 2;\n            ctx.strokeRect(bx, by, boxSize, boxSize);\n\n            ctx.fillStyle = \"rgba(15, 23, 42, 0.85)\";\n            ctx.fillRect(bx, by - 22, boxSize, 20);\n            ctx.fillStyle = \"#f8fafc\";\n            ctx.font = \"bold 11px monospace\";\n            ctx.fillText(\"ALVO SIMULADO [\" + state.currentState + \"]\", bx + 6, by - 8);\n          }\n        }\n\n        // HUD Overlay (crosshair + telemetry readouts)\n        ctx.strokeStyle = \"rgba(56, 189, 248, 0.65)\";\n        ctx.lineWidth = 1.5;\n        ctx.beginPath();\n        ctx.arc(w / 2, h / 2, 26, 0, Math.PI * 2);\n        ctx.moveTo(w / 2 - 42, h / 2);\n        ctx.lineTo(w / 2 - 12, h / 2);\n        ctx.moveTo(w / 2 + 12, h / 2);\n        ctx.lineTo(w / 2 + 42, h / 2);\n        ctx.moveTo(w / 2, h / 2 - 42);\n        ctx.lineTo(w / 2, h / 2 - 12);\n        ctx.moveTo(w / 2, h / 2 + 12);\n        ctx.lineTo(w / 2, h / 2 + 42);\n        ctx.stroke();\n\n        // Top HUD bar\n        ctx.fillStyle = \"rgba(9, 13, 22, 0.72)\";\n        ctx.fillRect(14, 14, w - 28, 32);\n        ctx.fillStyle = \"#38bdf8\";\n        ctx.font = \"bold 12px monospace\";\n        const batTxt =\n          state.telemetry.battery_percent !== null\n            ? state.telemetry.battery_percent.toFixed(1) + \"%\"\n            : \"--%\";\n        const tmpTxt =\n          state.telemetry.temperature_c !== null\n            ? state.telemetry.temperature_c.toFixed(1) + \"°C\"\n            : \"--°C\";\n        const frTxt =\n          state.telemetry.proximity_cm.front !== null\n            ? state.telemetry.proximity_cm.front.toFixed(0) + \"cm\"\n            : \"--cm\";\n        ctx.fillText(\n          \"MODO: \" +\n            state.currentState +\n            \"   |   MOV: \" +\n            state.motion +\n            \"   |   BAT: \" +\n            batTxt +\n            \"   |   TEMP: \" +\n            tmpTxt +\n            \"   |   FRENTE: \" +\n            frTxt,\n          26,\n          34\n        );\n\n        requestAnimationFrame(renderCameraHud);\n      }\n\n      // Bind Controls\n      document.querySelectorAll(\".mode-btn\").forEach((btn) => {\n        btn.addEventListener(\"click\", () => sendMode(btn.getAttribute(\"data-mode\")));\n      });\n\n      document.querySelectorAll(\".dpad-btn\").forEach((btn) => {\n        btn.addEventListener(\"click\", () => sendManual(btn.getAttribute(\"data-action\")));\n      });\n\n      document.getElementById(\"btnEmergencyTop\").addEventListener(\"click\", () => {\n        sendManual(\"PARAR\");\n      });\n\n      durationSlider.addEventListener(\"input\", () => {\n        durationLabel.textContent = durationSlider.value + \" ms\";\n      });\n\n      document.getElementById(\"btnClearAlarms\").addEventListener(\"click\", () => {\n        alarmList.innerHTML = \"\";\n      });\n\n      document.getElementById(\"btnClearLogs\").addEventListener(\"click\", () => {\n        logList.innerHTML = \"\";\n      });\n\n      window.addEventListener(\"keydown\", (ev) => {\n        if (!chkKeyboard.checked) return;\n        const tag = (ev.target && ev.target.tagName) || \"\";\n        if (tag === \"INPUT\" || tag === \"TEXTAREA\" || tag === \"SELECT\") return;\n\n        const key = ev.key.toLowerCase();\n        let action = null;\n        if (key === \" \" || key === \"escape\") action = \"PARAR\";\n        else if (key === \"w\" || key === \"arrowup\") action = \"AVANCAR\";\n        else if (key === \"s\" || key === \"arrowdown\") action = \"RECUAR\";\n        else if (key === \"a\" || key === \"arrowleft\") action = \"ESQUERDA\";\n        else if (key === \"d\" || key === \"arrowright\") action = \"DIREITA\";\n\n        if (action) {\n          ev.preventDefault();\n          sendManual(action);\n        }\n      });\n\n      // Age ticker\n      setInterval(() => {\n        if (!state.lastPacketMs) {\n          lastSeenBadge.textContent = \"Último pacote: aguardando\";\n          return;\n        }\n        const sec = ((Date.now() - state.lastPacketMs) / 1000).toFixed(1);\n        lastSeenBadge.textContent = \"Último pacote: há \" + sec + \"s\";\n      }, 300);\n\n      drawRadar();\n      connectWebSocket();\n      requestAnimationFrame(renderCameraHud);\n    })();\n  </script>\n</body>\n</html>\n","output":"str","x":430,"y":960,"wires":[["dashboard-http-out"]]},{"id":"dashboard-http-out","type":"http response","z":"rover-tab","name":"200 HTML","statusCode":"200","headers":{"content-type":"text/html; charset=utf-8"},"x":700,"y":960,"wires":[]},{"id":"snapshot-http-in","type":"http in","z":"rover-tab","name":"GET /api/rover/snapshot","url":"/api/rover/snapshot","method":"get","upload":false,"swaggerDoc":"","x":180,"y":1020,"wires":[["snapshot-fn"]]},{"id":"snapshot-fn","type":"function","z":"rover-tab","name":"Ler snapshot atual","func":"const snap = flow.get(\"rover_snapshot\") || {\n  telemetry: null, state: null, status: null, last_ack: null,\n  history: [], alarms: [], logs: []\n};\nmsg.payload = JSON.stringify({\n  version: \"1.0\",\n  simulated: true,\n  station_source: env.get(\"STATION_SOURCE\") || \"station-nodered\",\n  timestamp: new Date().toISOString(),\n  ...snap\n});\nreturn msg;","outputs":1,"noerr":0,"x":440,"y":1020,"wires":[["snapshot-http-out"]]},{"id":"snapshot-http-out","type":"http response","z":"rover-tab","name":"200 JSON","statusCode":"200","headers":{"content-type":"application/json; charset=utf-8"},"x":700,"y":1020,"wires":[]},{"id":"cmd-http-in","type":"http in","z":"rover-tab","name":"POST /api/rover/command","url":"/api/rover/command","method":"post","upload":false,"swaggerDoc":"","x":180,"y":1080,"wires":[["cmd-http-fn"]]},{"id":"cmd-http-fn","type":"function","z":"rover-tab","name":"Validar comando HTTP","func":"const b = msg.payload || {};\nconst modes = [\"SEGURO_ESPERA\",\"BUSCA\",\"APROXIMACAO\",\"AGUARDANDO_PEGA\",\"CAPTURA_MANUAL\"];\nconst actions = [\"PARAR\",\"AVANCAR\",\"RECUAR\",\"ESQUERDA\",\"DIREITA\"];\nif (b.kind === \"mode\" && modes.includes(b.mode)) {\n  const cmdMsg = { topic: \"rover/cmd/modo\", payload: b.mode };\n  msg.statusCode = 202;\n  msg.payload = JSON.stringify({ accepted_by_station: true, topic: \"rover/cmd/modo\", mode: b.mode });\n  return [cmdMsg, msg];\n}\nif (b.kind === \"manual\" && actions.includes(b.action)) {\n  const d = Number(b.duration_ms);\n  const dur = Number.isInteger(d) && d >= 100 && d <= 1000 ? d : 500;\n  const cmdMsg = { topic: \"rover/cmd/manual\", payload: b.action, duration_ms: dur };\n  msg.statusCode = 202;\n  msg.payload = JSON.stringify({ accepted_by_station: true, topic: \"rover/cmd/manual\", action: b.action, duration_ms: dur });\n  return [cmdMsg, msg];\n}\nmsg.statusCode = 400;\nmsg.payload = JSON.stringify({ accepted_by_station: false, error: \"INVALID_COMMAND_REQUEST\" });\nreturn [null, msg];","outputs":2,"noerr":0,"x":450,"y":1080,"wires":[["command"],["cmd-http-out"]]},{"id":"cmd-http-out","type":"http response","z":"rover-tab","name":"HTTP Cmd Resp","statusCode":"","headers":{"content-type":"application/json; charset=utf-8"},"x":710,"y":1080,"wires":[]},{"id":"inject-recuar","type":"inject","z":"rover-tab","name":"RECUAR (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/manual","payload":"RECUAR","payloadType":"str","x":180,"y":790,"wires":[["command"]]},{"id":"inject-esquerda","type":"inject","z":"rover-tab","name":"ESQUERDA (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/manual","payload":"ESQUERDA","payloadType":"str","x":460,"y":740,"wires":[["command"]]},{"id":"inject-direita","type":"inject","z":"rover-tab","name":"DIREITA (simulado)","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":0.1,"topic":"rover/cmd/manual","payload":"DIREITA","payloadType":"str","x":450,"y":800,"wires":[["command"]]}]
+[
+  {
+    "id": "rover-tab",
+    "type": "tab",
+    "label": "RoboticRover • SIMULAÇÃO",
+    "disabled": false,
+    "info": "Somente dados artificiais. UUID e TTL por comando. Heartbeat não retained a cada segundo. Parada MQTT não substitui emergência física."
+  },
+  {
+    "id": "broker",
+    "type": "mqtt-broker",
+    "name": "Mosquitto (ambiente)",
+    "broker": "127.0.0.1",
+    "port": "1883",
+    "clientid": "station-nodered-01",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "5",
+    "keepalive": "5",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "sessionExpiry": "0"
+  },
+  {
+    "id": "dashboard-ws-server",
+    "type": "websocket-listener",
+    "path": "/ws/rover",
+    "wholemsg": "false"
+  },
+  {
+    "id": "rx",
+    "type": "mqtt in",
+    "z": "rover-tab",
+    "name": "Rover → estação",
+    "topic": "rover/#",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 140,
+    "y": 100,
+    "wires": [
+      [
+        "json"
+      ]
+    ]
+  },
+  {
+    "id": "json",
+    "type": "json",
+    "z": "rover-tab",
+    "name": "Interpretar JSON",
+    "property": "payload",
+    "action": "obj",
+    "pretty": false,
+    "x": 360,
+    "y": 100,
+    "wires": [
+      [
+        "validate"
+      ]
+    ]
+  },
+  {
+    "id": "validate",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Verificar envelope e tópico",
+    "func": "const types = {\"rover/estado\":\"state\",\"rover/telemetria\":\"telemetry\",\"rover/alarme\":\"alarm\",\"rover/log\":\"log\",\"rover/status\":\"status\",\"rover/cmd/ack\":\"ack\"};\nif (!types[msg.topic]) return null;\nconst p = msg.payload;\nif (!p || p.version !== \"1.0\" || typeof p.simulated !== \"boolean\" || p.type !== types[msg.topic] ||\n    typeof p.source !== \"string\" || !p.source || !Number.isFinite(Date.parse(p.timestamp)) ||\n    !p.data || typeof p.data !== \"object\" || Array.isArray(p.data)) {\n    node.error(\"Envelope inválido recebido\", msg); return null;\n}\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 600,
+    "y": 100,
+    "wires": [
+      [
+        "route",
+        "dashboard-store"
+      ]
+    ]
+  },
+  {
+    "id": "route",
+    "type": "switch",
+    "z": "rover-tab",
+    "name": "Tipo de mensagem",
+    "property": "topic",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "eq",
+        "v": "rover/estado",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/telemetria",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/alarme",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/log",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/status",
+        "vt": "str"
+      },
+      {
+        "t": "eq",
+        "v": "rover/cmd/ack",
+        "vt": "str"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 6,
+    "x": 850,
+    "y": 100,
+    "wires": [
+      [
+        "debug-state"
+      ],
+      [
+        "debug-telemetry"
+      ],
+      [
+        "debug-alarm"
+      ],
+      [
+        "debug-log"
+      ],
+      [
+        "debug-status"
+      ],
+      [
+        "debug-ack"
+      ]
+    ]
+  },
+  {
+    "id": "catch",
+    "type": "catch",
+    "z": "rover-tab",
+    "name": "Erros do fluxo",
+    "scope": null,
+    "uncaught": false,
+    "x": 150,
+    "y": 240,
+    "wires": [
+      [
+        "debug-errors"
+      ]
+    ]
+  },
+  {
+    "id": "debug-errors",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "Erros / JSON inválido",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 430,
+    "y": 240,
+    "wires": []
+  },
+  {
+    "id": "heartbeat-timer",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "Heartbeat 1 s (SIMULADO)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "10",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 180,
+    "y": 320,
+    "wires": [
+      [
+        "heartbeat"
+      ]
+    ]
+  },
+  {
+    "id": "heartbeat",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Heartbeat fresco; sessão da estação",
+    "func": "function makeUUID() {\n  const c = global.get(\"crypto\");\n  if (c && typeof c.randomUUID === \"function\") return c.randomUUID();\n  return \"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx\".replace(/[xy]/g, function(ch) {\n    const r = (Math.random() * 16) | 0;\n    const v = ch === \"x\" ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\nlet session = context.get(\"session\");\nif (!session) { session = makeUUID(); context.set(\"session\", session); }\nmsg.topic = \"station/heartbeat\";\nmsg.qos = 1; msg.retain = false;\nmsg.payload = JSON.stringify({version:\"1.0\",timestamp:new Date().toISOString(),\n  source:env.get(\"STATION_SOURCE\") || \"station-nodered\",simulated:true,type:\"heartbeat\",\n  data:{online:true,session_id:session}});\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 510,
+    "y": 320,
+    "wires": [
+      [
+        "tx"
+      ]
+    ]
+  },
+  {
+    "id": "command",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Comando: UUID + TTL 5 s",
+    "func": "function makeUUID() {\n  const c = global.get(\"crypto\");\n  if (c && typeof c.randomUUID === \"function\") return c.randomUUID();\n  return \"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx\".replace(/[xy]/g, function(ch) {\n    const r = (Math.random() * 16) | 0;\n    const v = ch === \"x\" ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\nconst now = Date.now();\nconst mode = msg.topic === \"rover/cmd/modo\";\nconst data = {command_id:makeUUID(),expires_at:new Date(now + 5000).toISOString()};\nif (mode) data.mode = msg.payload;\nelse {\n  data.action = msg.payload;\n  const dur = Number(msg.duration_ms);\n  data.duration_ms = Number.isInteger(dur) && dur >= 100 && dur <= 1000 ? dur : 500;\n}\nmsg.payload = JSON.stringify({version:\"1.0\",timestamp:new Date(now).toISOString(),\n  source:env.get(\"STATION_SOURCE\") || \"station-nodered\",simulated:true,\n  type:mode ? \"mode_command\":\"manual_command\",data});\nmsg.qos = 1; msg.retain = false;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 520,
+    "y": 600,
+    "wires": [
+      [
+        "tx"
+      ]
+    ]
+  },
+  {
+    "id": "tx",
+    "type": "mqtt out",
+    "z": "rover-tab",
+    "name": "Estação → Rover (nunca retained)",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "application/json",
+    "userProps": "",
+    "correl": "",
+    "expiry": "5",
+    "broker": "broker",
+    "x": 890,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "comment-safety",
+    "type": "comment",
+    "z": "rover-tab",
+    "name": "SIMULAÇÃO • avance em sequência; PARAR sempre leva a SEGURO_ESPERA",
+    "info": "Heartbeat ausente por 4 s ou desconexão => estado seguro. Comandos de movimento só em CAPTURA_MANUAL; duração máxima 1 s. Dados artificiais. Emergência física e watchdog Arduino serão independentes.",
+    "x": 440,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "debug-state",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · state",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "debug-telemetry",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · telemetry",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 75,
+    "wires": []
+  },
+  {
+    "id": "debug-alarm",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · alarm",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 110,
+    "wires": []
+  },
+  {
+    "id": "debug-log",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · log",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 145,
+    "wires": []
+  },
+  {
+    "id": "debug-status",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · status",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "debug-ack",
+    "type": "debug",
+    "z": "rover-tab",
+    "name": "SIMULADO · ack",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "x": 1110,
+    "y": 215,
+    "wires": []
+  },
+  {
+    "id": "inject-busca",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "BUSCA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "BUSCA",
+    "payloadType": "str",
+    "x": 180,
+    "y": 450,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-aproximacao",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "APROXIMACAO (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "APROXIMACAO",
+    "payloadType": "str",
+    "x": 180,
+    "y": 500,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-aguardando_pega",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "AGUARDANDO_PEGA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "AGUARDANDO_PEGA",
+    "payloadType": "str",
+    "x": 180,
+    "y": 550,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-captura_manual",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "CAPTURA_MANUAL (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "CAPTURA_MANUAL",
+    "payloadType": "str",
+    "x": 180,
+    "y": 600,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-seguro_espera",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "SEGURO_ESPERA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/modo",
+    "payload": "SEGURO_ESPERA",
+    "payloadType": "str",
+    "x": 180,
+    "y": 650,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-parar",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "PARAR (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "PARAR",
+    "payloadType": "str",
+    "x": 180,
+    "y": 700,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-avancar",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "AVANCAR (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "AVANCAR",
+    "payloadType": "str",
+    "x": 180,
+    "y": 750,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "comment-dashboard",
+    "type": "comment",
+    "z": "rover-tab",
+    "name": "DASHBOARD DO OPERADOR • acesse http://127.0.0.1:1880/dashboard (Telemetria + Câmera WebRTC/MJPEG/HUD + Controle)",
+    "info": "Interface web servida em /dashboard com WebSocket em /ws/rover, snapshot em /api/rover/snapshot e comandos em /api/rover/command.",
+    "x": 520,
+    "y": 840,
+    "wires": []
+  },
+  {
+    "id": "dashboard-store",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Atualizar snapshot + WS",
+    "func": "const p = msg.payload;\nif (!p || typeof p !== \"object\") return null;\nconst snap = flow.get(\"rover_snapshot\") || {\n  telemetry: null, state: null, status: null, last_ack: null,\n  history: [], alarms: [], logs: []\n};\nif (p.type === \"telemetry\" && p.data) {\n  snap.telemetry = p;\n  snap.history.push({\n    timestamp: p.timestamp,\n    battery_percent: p.data.battery_percent,\n    temperature_c: p.data.temperature_c,\n    front: p.data.proximity_cm ? p.data.proximity_cm.front : null,\n    left: p.data.proximity_cm ? p.data.proximity_cm.left : null,\n    right: p.data.proximity_cm ? p.data.proximity_cm.right : null\n  });\n  if (snap.history.length > 60) snap.history.shift();\n} else if (p.type === \"state\") {\n  snap.state = p;\n} else if (p.type === \"status\") {\n  snap.status = p;\n} else if (p.type === \"ack\") {\n  snap.last_ack = p;\n} else if (p.type === \"alarm\") {\n  snap.alarms.unshift(p);\n  if (snap.alarms.length > 30) snap.alarms.pop();\n} else if (p.type === \"log\") {\n  snap.logs.unshift(p);\n  if (snap.logs.length > 40) snap.logs.pop();\n}\nflow.set(\"rover_snapshot\", snap);\nreturn { payload: JSON.stringify(p) };",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 860,
+    "y": 270,
+    "wires": [
+      [
+        "dashboard-ws-out"
+      ]
+    ]
+  },
+  {
+    "id": "dashboard-ws-out",
+    "type": "websocket out",
+    "z": "rover-tab",
+    "name": "WS Out (/ws/rover)",
+    "server": "dashboard-ws-server",
+    "client": "",
+    "x": 1120,
+    "y": 270,
+    "wires": []
+  },
+  {
+    "id": "dashboard-ws-in",
+    "type": "websocket in",
+    "z": "rover-tab",
+    "name": "WS In (/ws/rover)",
+    "server": "dashboard-ws-server",
+    "client": "",
+    "x": 160,
+    "y": 900,
+    "wires": [
+      [
+        "dashboard-ws-cmd"
+      ]
+    ]
+  },
+  {
+    "id": "dashboard-ws-cmd",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Converter comando WS",
+    "func": "let body = msg.payload;\nif (typeof body === \"string\") {\n  try { body = JSON.parse(body); } catch (_) { return null; }\n}\nif (!body || typeof body !== \"object\") return null;\nconst modes = [\"SEGURO_ESPERA\",\"BUSCA\",\"APROXIMACAO\",\"AGUARDANDO_PEGA\",\"CAPTURA_MANUAL\"];\nconst actions = [\"PARAR\",\"AVANCAR\",\"RECUAR\",\"ESQUERDA\",\"DIREITA\"];\nif (body.kind === \"mode\" && modes.includes(body.mode)) {\n  return { topic: \"rover/cmd/modo\", payload: body.mode };\n}\nif (body.kind === \"manual\" && actions.includes(body.action)) {\n  const d = Number(body.duration_ms);\n  return {\n    topic: \"rover/cmd/manual\",\n    payload: body.action,\n    duration_ms: Number.isInteger(d) && d >= 100 && d <= 1000 ? d : 500\n  };\n}\nreturn null;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 420,
+    "y": 900,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "dashboard-http-in",
+    "type": "http in",
+    "z": "rover-tab",
+    "name": "GET /dashboard",
+    "url": "/dashboard",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 150,
+    "y": 960,
+    "wires": [
+      [
+        "dashboard-ui-template"
+      ]
+    ]
+  },
+  {
+    "id": "dashboard-ui-template",
+    "type": "template",
+    "z": "rover-tab",
+    "name": "HTML Dashboard Operador",
+    "field": "payload",
+    "fieldType": "msg",
+    "format": "html",
+    "syntax": "plain",
+    "template": "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>RoboticRover • Dashboard da Estação-Base</title>\n  <style>\n    :root {\n      --bg-base: #090d16;\n      --bg-panel: #111827;\n      --bg-card: #172033;\n      --bg-card-hover: #1e293b;\n      --border: #26334d;\n      --border-highlight: #3b82f6;\n      --text-main: #f1f5f9;\n      --text-muted: #94a3b8;\n      --text-dim: #64748b;\n      --accent: #38bdf8;\n      --accent-strong: #0284c7;\n      --ok: #10b981;\n      --ok-bg: rgba(16, 185, 129, 0.14);\n      --warn: #f59e0b;\n      --warn-bg: rgba(245, 158, 11, 0.14);\n      --danger: #ef4444;\n      --danger-bg: rgba(239, 68, 68, 0.16);\n      --radius: 10px;\n      --font-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Inter, sans-serif;\n      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Courier New\", monospace;\n    }\n\n    * {\n      box-sizing: border-box;\n      margin: 0;\n      padding: 0;\n    }\n\n    body {\n      background: radial-gradient(circle at top, #131c31 0%, var(--bg-base) 70%);\n      color: var(--text-main);\n      font-family: var(--font-sans);\n      min-height: 100vh;\n      line-height: 1.45;\n    }\n\n    /* Top Bar */\n    .topbar {\n      display: flex;\n      flex-wrap: wrap;\n      align-items: center;\n      justify-content: space-between;\n      gap: 12px;\n      padding: 12px 20px;\n      background: rgba(17, 24, 39, 0.92);\n      border-bottom: 1px solid var(--border);\n      position: sticky;\n      top: 0;\n      z-index: 50;\n      backdrop-filter: blur(10px);\n    }\n\n    .brand {\n      display: flex;\n      align-items: center;\n      gap: 12px;\n    }\n\n    .brand-icon {\n      width: 36px;\n      height: 36px;\n      border-radius: 8px;\n      background: linear-gradient(135deg, #0ea5e9, #2563eb);\n      display: grid;\n      place-items: center;\n      font-weight: 800;\n      font-family: var(--font-mono);\n      letter-spacing: -0.5px;\n      box-shadow: 0 0 16px rgba(14, 165, 233, 0.35);\n    }\n\n    .brand-title {\n      font-size: 1.05rem;\n      font-weight: 700;\n      letter-spacing: 0.3px;\n      display: flex;\n      align-items: center;\n      gap: 8px;\n    }\n\n    .brand-sub {\n      font-size: 0.76rem;\n      color: var(--text-muted);\n    }\n\n    .badge {\n      display: inline-flex;\n      align-items: center;\n      gap: 6px;\n      padding: 3px 9px;\n      border-radius: 999px;\n      font-size: 0.72rem;\n      font-weight: 600;\n      font-family: var(--font-mono);\n      border: 1px solid transparent;\n    }\n\n    .badge-sim {\n      background: rgba(56, 189, 248, 0.14);\n      color: var(--accent);\n      border-color: rgba(56, 189, 248, 0.35);\n    }\n\n    .badge-ok {\n      background: var(--ok-bg);\n      color: #34d399;\n      border-color: rgba(16, 185, 129, 0.35);\n    }\n\n    .badge-warn {\n      background: var(--warn-bg);\n      color: #fbbf24;\n      border-color: rgba(245, 158, 11, 0.35);\n    }\n\n    .badge-danger {\n      background: var(--danger-bg);\n      color: #f87171;\n      border-color: rgba(239, 68, 68, 0.4);\n    }\n\n    .dot {\n      width: 7px;\n      height: 7px;\n      border-radius: 50%;\n      background: currentColor;\n      display: inline-block;\n    }\n\n    .status-strip {\n      display: flex;\n      flex-wrap: wrap;\n      align-items: center;\n      gap: 10px;\n    }\n\n    .btn-emergency {\n      background: linear-gradient(135deg, #dc2626, #991b1b);\n      color: #fff;\n      border: 1px solid #f87171;\n      padding: 8px 16px;\n      border-radius: 8px;\n      font-weight: 700;\n      font-size: 0.82rem;\n      letter-spacing: 0.5px;\n      cursor: pointer;\n      box-shadow: 0 0 18px rgba(239, 68, 68, 0.4);\n      transition: transform 0.1s ease, box-shadow 0.15s ease;\n    }\n\n    .btn-emergency:hover {\n      box-shadow: 0 0 24px rgba(239, 68, 68, 0.7);\n      transform: translateY(-1px);\n    }\n\n    .btn-emergency:active {\n      transform: translateY(0);\n    }\n\n    /* Main Grid */\n    .container {\n      max-width: 1600px;\n      margin: 0 auto;\n      padding: 16px 20px 28px;\n      display: flex;\n      flex-direction: column;\n      gap: 16px;\n    }\n\n    .section-title {\n      font-size: 0.78rem;\n      text-transform: uppercase;\n      letter-spacing: 1px;\n      color: var(--text-muted);\n      font-weight: 700;\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      margin-bottom: 10px;\n    }\n\n    /* Telemetry Row */\n    .telemetry-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr 1.45fr;\n      gap: 16px;\n    }\n\n    @media (max-width: 1200px) {\n      .telemetry-grid {\n        grid-template-columns: 1fr 1fr;\n      }\n      .telemetry-grid > :last-child {\n        grid-column: span 2;\n      }\n    }\n\n    @media (max-width: 768px) {\n      .telemetry-grid {\n        grid-template-columns: 1fr;\n      }\n      .telemetry-grid > :last-child {\n        grid-column: span 1;\n      }\n    }\n\n    .panel {\n      background: var(--bg-panel);\n      border: 1px solid var(--border);\n      border-radius: var(--radius);\n      padding: 16px;\n      display: flex;\n      flex-direction: column;\n      gap: 12px;\n      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);\n    }\n\n    .metric-header {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n    }\n\n    .metric-label {\n      font-size: 0.84rem;\n      color: var(--text-muted);\n      font-weight: 600;\n    }\n\n    .metric-main {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      gap: 14px;\n    }\n\n    .metric-value {\n      font-size: 2.15rem;\n      font-weight: 800;\n      font-family: var(--font-mono);\n      letter-spacing: -1px;\n    }\n\n    .metric-unit {\n      font-size: 1rem;\n      color: var(--text-muted);\n      font-weight: 500;\n    }\n\n    .progress-track {\n      width: 100%;\n      height: 10px;\n      background: #0b111e;\n      border-radius: 999px;\n      overflow: hidden;\n      border: 1px solid var(--border);\n    }\n\n    .progress-fill {\n      height: 100%;\n      width: 0%;\n      background: linear-gradient(90deg, #10b981, #34d399);\n      border-radius: 999px;\n      transition: width 0.25s ease, background 0.25s ease;\n    }\n\n    .sparkline-box {\n      background: #0b111e;\n      border: 1px solid rgba(38, 51, 77, 0.7);\n      border-radius: 8px;\n      padding: 6px 8px;\n    }\n\n    .sparkline-canvas {\n      width: 100%;\n      height: 64px;\n      display: block;\n    }\n\n    .metric-stats {\n      display: flex;\n      justify-content: space-between;\n      font-size: 0.74rem;\n      color: var(--text-dim);\n      font-family: var(--font-mono);\n    }\n\n    /* Proximity Radar & Bars */\n    .proximity-layout {\n      display: grid;\n      grid-template-columns: 185px 1fr;\n      gap: 16px;\n      align-items: center;\n    }\n\n    @media (max-width: 560px) {\n      .proximity-layout {\n        grid-template-columns: 1fr;\n        justify-items: center;\n      }\n    }\n\n    .radar-wrap {\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 10px;\n      padding: 6px;\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n    }\n\n    .prox-bars {\n      display: flex;\n      flex-direction: column;\n      gap: 12px;\n      width: 100%;\n    }\n\n    .prox-item {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 9px 12px;\n      display: flex;\n      flex-direction: column;\n      gap: 6px;\n    }\n\n    .prox-row {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      font-size: 0.82rem;\n    }\n\n    .prox-val {\n      font-family: var(--font-mono);\n      font-weight: 700;\n      font-size: 0.96rem;\n    }\n\n    /* Middle Row: Camera + Controls */\n    .workspace-grid {\n      display: grid;\n      grid-template-columns: 1.35fr 1fr;\n      gap: 16px;\n    }\n\n    @media (max-width: 1100px) {\n      .workspace-grid {\n        grid-template-columns: 1fr;\n      }\n    }\n\n    /* Camera Viewport */\n    .cam-toolbar {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 8px;\n      align-items: center;\n      justify-content: space-between;\n    }\n\n    .tab-group {\n      display: inline-flex;\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 3px;\n      gap: 4px;\n    }\n\n    .tab-btn {\n      background: transparent;\n      color: var(--text-muted);\n      border: none;\n      padding: 6px 11px;\n      border-radius: 6px;\n      font-size: 0.78rem;\n      font-weight: 600;\n      cursor: pointer;\n      transition: all 0.15s ease;\n    }\n\n    .tab-btn.active {\n      background: var(--bg-card-hover);\n      color: var(--accent);\n      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);\n    }\n\n    .cam-config-bar {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 8px;\n      align-items: center;\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      padding: 8px 10px;\n      border-radius: 8px;\n    }\n\n    .cam-input {\n      flex: 1;\n      min-width: 210px;\n      background: #0b111e;\n      color: var(--text-main);\n      border: 1px solid var(--border);\n      border-radius: 6px;\n      padding: 6px 10px;\n      font-family: var(--font-mono);\n      font-size: 0.78rem;\n    }\n\n    .btn {\n      background: var(--bg-card-hover);\n      color: var(--text-main);\n      border: 1px solid var(--border);\n      padding: 6px 12px;\n      border-radius: 6px;\n      font-size: 0.78rem;\n      font-weight: 600;\n      cursor: pointer;\n      transition: all 0.15s ease;\n    }\n\n    .btn:hover:not(:disabled) {\n      border-color: var(--accent);\n      color: var(--accent);\n    }\n\n    .btn-primary {\n      background: var(--accent-strong);\n      border-color: var(--accent);\n      color: #fff;\n    }\n\n    .btn-primary:hover:not(:disabled) {\n      background: #0369a1;\n      color: #fff;\n    }\n\n    .cam-stage {\n      position: relative;\n      width: 100%;\n      aspect-ratio: 16 / 9;\n      background: #05080f;\n      border: 1px solid var(--border);\n      border-radius: 10px;\n      overflow: hidden;\n      display: grid;\n      place-items: center;\n    }\n\n    .cam-stage video,\n    .cam-stage img,\n    .cam-stage iframe,\n    .cam-stage canvas {\n      width: 100%;\n      height: 100%;\n      object-fit: cover;\n      display: block;\n    }\n\n    #camHudCanvas {\n      position: absolute;\n      inset: 0;\n      pointer-events: none;\n      z-index: 5;\n    }\n\n    .cam-info-note {\n      font-size: 0.75rem;\n      color: var(--text-muted);\n      background: rgba(15, 23, 42, 0.75);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 8px 12px;\n    }\n\n    .cam-info-note code {\n      color: var(--accent);\n      font-family: var(--font-mono);\n    }\n\n    /* State Machine & Manual Controls */\n    .state-banner {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 12px;\n      display: flex;\n      flex-wrap: wrap;\n      align-items: center;\n      justify-content: space-between;\n      gap: 10px;\n    }\n\n    .state-current {\n      font-family: var(--font-mono);\n      font-size: 1.25rem;\n      font-weight: 800;\n      color: var(--accent);\n    }\n\n    .state-meta {\n      font-size: 0.76rem;\n      color: var(--text-muted);\n      font-family: var(--font-mono);\n    }\n\n    .mode-pipeline {\n      display: grid;\n      grid-template-columns: repeat(5, 1fr);\n      gap: 8px;\n    }\n\n    @media (max-width: 680px) {\n      .mode-pipeline {\n        grid-template-columns: repeat(2, 1fr);\n      }\n    }\n\n    .mode-btn {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 10px 8px;\n      color: var(--text-main);\n      font-family: var(--font-mono);\n      font-size: 0.73rem;\n      font-weight: 700;\n      cursor: pointer;\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n      gap: 4px;\n      transition: all 0.15s ease;\n      text-align: center;\n    }\n\n    .mode-btn .step-tag {\n      font-size: 0.65rem;\n      color: var(--text-dim);\n      font-weight: 500;\n    }\n\n    .mode-btn.active-state {\n      border-color: var(--ok);\n      background: rgba(16, 185, 129, 0.14);\n      color: #34d399;\n      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);\n    }\n\n    .mode-btn.next-valid {\n      border-color: var(--accent);\n      background: rgba(56, 189, 248, 0.1);\n    }\n\n    .mode-btn:hover {\n      transform: translateY(-1px);\n      border-color: var(--accent);\n    }\n\n    /* Manual D-Pad */\n    .manual-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 14px;\n      align-items: center;\n    }\n\n    @media (max-width: 560px) {\n      .manual-grid {\n        grid-template-columns: 1fr;\n      }\n    }\n\n    .dpad {\n      display: grid;\n      grid-template-columns: repeat(3, 64px);\n      grid-template-rows: repeat(3, 52px);\n      gap: 8px;\n      justify-content: center;\n    }\n\n    .dpad-btn {\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      color: var(--text-main);\n      font-family: var(--font-mono);\n      font-size: 0.72rem;\n      font-weight: 700;\n      cursor: pointer;\n      display: flex;\n      flex-direction: column;\n      align-items: center;\n      justify-content: center;\n      gap: 2px;\n      user-select: none;\n      transition: all 0.1s ease;\n    }\n\n    .dpad-btn kbd {\n      font-size: 0.62rem;\n      color: var(--text-dim);\n    }\n\n    .dpad-btn:hover {\n      border-color: var(--accent);\n      background: var(--bg-card-hover);\n    }\n\n    .dpad-btn:active,\n    .dpad-btn.pressed {\n      background: var(--accent-strong);\n      border-color: var(--accent);\n      transform: scale(0.96);\n    }\n\n    .dpad-stop {\n      background: rgba(239, 68, 68, 0.18);\n      border-color: rgba(239, 68, 68, 0.5);\n      color: #fca5a5;\n    }\n\n    .manual-options {\n      display: flex;\n      flex-direction: column;\n      gap: 10px;\n      background: var(--bg-card);\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 12px;\n      font-size: 0.78rem;\n    }\n\n    .ack-box {\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      padding: 10px 12px;\n      font-family: var(--font-mono);\n      font-size: 0.76rem;\n      display: flex;\n      flex-direction: column;\n      gap: 4px;\n    }\n\n    /* Bottom Feed */\n    .feed-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 16px;\n    }\n\n    @media (max-width: 960px) {\n      .feed-grid {\n        grid-template-columns: 1fr;\n      }\n    }\n\n    .event-list {\n      background: #0b111e;\n      border: 1px solid var(--border);\n      border-radius: 8px;\n      height: 190px;\n      overflow-y: auto;\n      padding: 8px;\n      font-family: var(--font-mono);\n      font-size: 0.74rem;\n      display: flex;\n      flex-direction: column;\n      gap: 6px;\n    }\n\n    .event-item {\n      padding: 6px 8px;\n      border-radius: 6px;\n      background: rgba(23, 32, 51, 0.7);\n      border-left: 3px solid var(--accent);\n      display: flex;\n      justify-content: space-between;\n      gap: 10px;\n    }\n\n    .event-item.warn {\n      border-left-color: var(--warn);\n    }\n\n    .event-item.error {\n      border-left-color: var(--danger);\n      background: rgba(239, 68, 68, 0.1);\n    }\n\n    .event-time {\n      color: var(--text-dim);\n      white-space: nowrap;\n    }\n  </style>\n</head>\n<body>\n  <!-- TOPBAR -->\n  <header class=\"topbar\">\n    <div class=\"brand\">\n      <div class=\"brand-icon\">RR</div>\n      <div>\n        <div class=\"brand-title\">\n          RoboticRover • Centro de Operações\n          <span class=\"badge badge-sim\" id=\"simBadge\">SIMULAÇÃO v1.0</span>\n        </div>\n        <div class=\"brand-sub\">Estação-Base Node-RED • Telemetria MQTT, Controle Operacional e Vídeo Híbrido</div>\n      </div>\n    </div>\n\n    <div class=\"status-strip\">\n      <span class=\"badge badge-warn\" id=\"wsBadge\">\n        <span class=\"dot\"></span>\n        <span id=\"wsText\">WS: Conectando...</span>\n      </span>\n      <span class=\"badge badge-danger\" id=\"roverOnlineBadge\">\n        <span class=\"dot\"></span>\n        <span id=\"roverOnlineText\">ROVER: Aguardando</span>\n      </span>\n      <span class=\"badge badge-sim\" id=\"lastSeenBadge\">Último pacote: --</span>\n      <button class=\"btn-emergency\" id=\"btnEmergencyTop\" type=\"button\" title=\"Atalho: Barra de Espaço ou Esc\">\n        PARADA DE EMERGÊNCIA (ESPAÇO)\n      </button>\n    </div>\n  </header>\n\n  <main class=\"container\">\n    <!-- TELEMETRY SECTION -->\n    <section>\n      <div class=\"section-title\">\n        <span>Telemetria em Tempo Real (`rover/telemetria`)</span>\n        <span id=\"telemetrySourceLabel\" style=\"font-family: var(--font-mono); font-size: 0.74rem;\">origem: --</span>\n      </div>\n\n      <div class=\"telemetry-grid\">\n        <!-- BATERIA -->\n        <div class=\"panel\">\n          <div class=\"metric-header\">\n            <span class=\"metric-label\">CARGA DA BATERIA</span>\n            <span class=\"badge badge-ok\" id=\"batteryBadge\">NOMINAL</span>\n          </div>\n          <div class=\"metric-main\">\n            <div>\n              <span class=\"metric-value\" id=\"batteryValue\">--.-</span>\n              <span class=\"metric-unit\">%</span>\n            </div>\n            <div style=\"text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);\">\n              <div id=\"batteryVoltageEst\">~ --.- V (LiPo 3S sim)</div>\n              <div id=\"batteryRateLabel\">Taxa: -0.002 %/amostra</div>\n            </div>\n          </div>\n          <div class=\"progress-track\">\n            <div class=\"progress-fill\" id=\"batteryBar\"></div>\n          </div>\n          <div class=\"sparkline-box\">\n            <canvas class=\"sparkline-canvas\" id=\"batterySparkline\" width=\"360\" height=\"64\"></canvas>\n          </div>\n          <div class=\"metric-stats\">\n            <span id=\"batteryMin\">Mín: --%</span>\n            <span id=\"batteryMax\">Máx: --%</span>\n            <span id=\"batterySamples\">Amostras: 0</span>\n          </div>\n        </div>\n\n        <!-- TEMPERATURA -->\n        <div class=\"panel\">\n          <div class=\"metric-header\">\n            <span class=\"metric-label\">TEMPERATURA INTERNA</span>\n            <span class=\"badge badge-ok\" id=\"tempBadge\">NORMAL</span>\n          </div>\n          <div class=\"metric-main\">\n            <div>\n              <span class=\"metric-value\" id=\"tempValue\">--.-</span>\n              <span class=\"metric-unit\">°C</span>\n            </div>\n            <div style=\"text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);\">\n              <div>Faixa operacional: 35–48 °C</div>\n              <div id=\"tempTrendLabel\">Tendência: estável</div>\n            </div>\n          </div>\n          <div class=\"progress-track\">\n            <div class=\"progress-fill\" id=\"tempBar\"></div>\n          </div>\n          <div class=\"sparkline-box\">\n            <canvas class=\"sparkline-canvas\" id=\"tempSparkline\" width=\"360\" height=\"64\"></canvas>\n          </div>\n          <div class=\"metric-stats\">\n            <span id=\"tempMin\">Mín: -- °C</span>\n            <span id=\"tempAvg\">Méd: -- °C</span>\n            <span id=\"tempMax\">Máx: -- °C</span>\n          </div>\n        </div>\n\n        <!-- SENSORES DE PROXIMIDADE -->\n        <div class=\"panel\">\n          <div class=\"metric-header\">\n            <span class=\"metric-label\">SENSORES DE PROXIMIDADE (FRENTE / ESQUERDA / DIREITA)</span>\n            <span class=\"badge badge-ok\" id=\"proxGlobalBadge\">CAMINHO LIVRE</span>\n          </div>\n\n          <div class=\"proximity-layout\">\n            <div class=\"radar-wrap\">\n              <canvas id=\"radarCanvas\" width=\"170\" height=\"150\"></canvas>\n              <span style=\"font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); margin-top: 2px;\">\n                RADAR 2D (0–200 cm)\n              </span>\n            </div>\n\n            <div class=\"prox-bars\">\n              <div class=\"prox-item\">\n                <div class=\"prox-row\">\n                  <span>▲ Frente (`front`)</span>\n                  <span class=\"prox-val\" id=\"proxFrontVal\">--.- cm</span>\n                </div>\n                <div class=\"progress-track\">\n                  <div class=\"progress-fill\" id=\"proxFrontBar\"></div>\n                </div>\n              </div>\n\n              <div class=\"prox-item\">\n                <div class=\"prox-row\">\n                  <span>◀ Esquerda (`left`)</span>\n                  <span class=\"prox-val\" id=\"proxLeftVal\">--.- cm</span>\n                </div>\n                <div class=\"progress-track\">\n                  <div class=\"progress-fill\" id=\"proxLeftBar\"></div>\n                </div>\n              </div>\n\n              <div class=\"prox-item\">\n                <div class=\"prox-row\">\n                  <span>▶ Direita (`right`)</span>\n                  <span class=\"prox-val\" id=\"proxRightVal\">--.- cm</span>\n                </div>\n                <div class=\"progress-track\">\n                  <div class=\"progress-fill\" id=\"proxRightBar\"></div>\n                </div>\n              </div>\n            </div>\n          </div>\n        </div>\n      </div>\n    </section>\n\n    <!-- CAMERA + CONTROLS -->\n    <section class=\"workspace-grid\">\n      <!-- HYBRID CAMERA PANEL -->\n      <div class=\"panel\">\n        <div class=\"cam-toolbar\">\n          <div class=\"metric-label\">CÂMERA DO ROVER (WEBRTC / MJPEG / SIMULADOR HUD)</div>\n          <div class=\"tab-group\" role=\"tablist\">\n            <button class=\"tab-btn active\" data-cam-mode=\"sim\" type=\"button\">Simulador HUD</button>\n            <button class=\"tab-btn\" data-cam-mode=\"webrtc\" type=\"button\">WebRTC (WHEP)</button>\n            <button class=\"tab-btn\" data-cam-mode=\"iframe\" type=\"button\">WebRTC (Player/Iframe)</button>\n            <button class=\"tab-btn\" data-cam-mode=\"mjpeg\" type=\"button\">MJPEG HTTP</button>\n          </div>\n        </div>\n\n        <div class=\"cam-config-bar\" id=\"camConfigBar\" style=\"display: none;\">\n          <span style=\"font-size: 0.76rem; color: var(--text-muted); font-weight: 600;\" id=\"camUrlLabel\">Endpoint:</span>\n          <input class=\"cam-input\" id=\"camUrlInput\" type=\"text\" placeholder=\"http://192.168.1.50:8889/rover/whep\" />\n          <button class=\"btn btn-primary\" id=\"btnCamConnect\" type=\"button\">Conectar</button>\n          <button class=\"btn\" id=\"btnCamDisconnect\" type=\"button\">Parar</button>\n          <label style=\"display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;\">\n            <input type=\"checkbox\" id=\"chkHudOverlay\" checked /> HUD\n          </label>\n        </div>\n\n        <div class=\"cam-stage\">\n          <video id=\"camVideo\" autoplay playsinline muted style=\"display: none;\"></video>\n          <img id=\"camMjpeg\" alt=\"Stream MJPEG do Rover\" style=\"display: none;\" />\n          <iframe id=\"camIframe\" title=\"Player WebRTC Embarcado\" style=\"display: none; border: none;\" allow=\"autoplay; fullscreen\"></iframe>\n          <canvas id=\"camHudCanvas\" width=\"768\" height=\"432\"></canvas>\n        </div>\n\n        <div class=\"cam-info-note\">\n          <strong>Protocolos de Câmera na Raspberry Pi 3:</strong>\n          Você provavelmente estava lembrando de <code>WebRTC</code> (via <strong>MediaMTX</strong>, <strong>go2rtc</strong> ou <strong>uStreamer WebRTC</strong> usando WHEP na porta <code>8889</code>) ou de <code>MJPEG sobre HTTP</code> (via <strong>uStreamer</strong> / <strong>mjpg-streamer</strong> na porta <code>8080</code>). Enquanto a câmera física não está conectada, o modo <strong>Simulador HUD</strong> renderiza a visão sintética sincronizada com os sensores e o estado atual do Rover.\n        </div>\n      </div>\n\n      <!-- STATE MACHINE & MANUAL CONTROLS -->\n      <div class=\"panel\">\n        <div class=\"section-title\" style=\"margin-bottom: 0;\">\n          <span>Máquina de Estados &amp; Navegação (`rover/estado`, `rover/cmd/*`)</span>\n          <span class=\"badge badge-sim\" id=\"motionBadge\">MOVIMENTO: PARAR</span>\n        </div>\n\n        <div class=\"state-banner\">\n          <div>\n            <div style=\"font-size: 0.72rem; color: var(--text-muted);\">ESTADO OPERACIONAL ATUAL</div>\n            <div class=\"state-current\" id=\"currentStateText\">SEGURO_ESPERA</div>\n          </div>\n          <div style=\"text-align: right;\">\n            <div class=\"state-meta\" id=\"prevStateText\">anterior: --</div>\n            <div class=\"state-meta\" id=\"stateReasonText\">motivo: inicializando</div>\n          </div>\n        </div>\n\n        <div style=\"font-size: 0.76rem; color: var(--text-muted);\">\n          Clique para comandar mudança de modo (o botão destacado em azul é o próximo passo válido da sequência):\n        </div>\n\n        <div class=\"mode-pipeline\">\n          <button class=\"mode-btn active-state\" data-mode=\"SEGURO_ESPERA\" type=\"button\">\n            <span class=\"step-tag\">0 • SEGURO</span>\n            <span>SEGURO_ESPERA</span>\n          </button>\n          <button class=\"mode-btn next-valid\" data-mode=\"BUSCA\" type=\"button\">\n            <span class=\"step-tag\">1 • INÍCIO</span>\n            <span>BUSCA</span>\n          </button>\n          <button class=\"mode-btn\" data-mode=\"APROXIMACAO\" type=\"button\">\n            <span class=\"step-tag\">2 • ALVO</span>\n            <span>APROXIMACAO</span>\n          </button>\n          <button class=\"mode-btn\" data-mode=\"AGUARDANDO_PEGA\" type=\"button\">\n            <span class=\"step-tag\">3 • POSIÇÃO</span>\n            <span>AGUARDANDO_PEGA</span>\n          </button>\n          <button class=\"mode-btn\" data-mode=\"CAPTURA_MANUAL\" type=\"button\">\n            <span class=\"step-tag\">4 • OPERADOR</span>\n            <span>CAPTURA_MANUAL</span>\n          </button>\n        </div>\n\n        <div class=\"manual-grid\">\n          <div class=\"dpad\">\n            <div></div>\n            <button class=\"dpad-btn\" data-action=\"AVANCAR\" type=\"button\">\n              <span>▲ AVANÇAR</span>\n              <kbd>W / ↑</kbd>\n            </button>\n            <div></div>\n\n            <button class=\"dpad-btn\" data-action=\"ESQUERDA\" type=\"button\">\n              <span>◀ ESQ</span>\n              <kbd>A / ←</kbd>\n            </button>\n            <button class=\"dpad-btn dpad-stop\" data-action=\"PARAR\" type=\"button\">\n              <span>■ PARAR</span>\n              <kbd>ESPAÇO</kbd>\n            </button>\n            <button class=\"dpad-btn\" data-action=\"DIREITA\" type=\"button\">\n              <span>DIR ▶</span>\n              <kbd>D / →</kbd>\n            </button>\n\n            <div></div>\n            <button class=\"dpad-btn\" data-action=\"RECUAR\" type=\"button\">\n              <span>▼ RECUAR</span>\n              <kbd>S / ↓</kbd>\n            </button>\n            <div></div>\n          </div>\n\n          <div class=\"manual-options\">\n            <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n              <span>Duração do pulso manual:</span>\n              <strong style=\"font-family: var(--font-mono); color: var(--accent);\" id=\"durationLabel\">500 ms</strong>\n            </div>\n            <input type=\"range\" id=\"durationSlider\" min=\"100\" max=\"1000\" step=\"50\" value=\"500\" />\n            <label style=\"display: flex; align-items: center; gap: 6px; cursor: pointer;\">\n              <input type=\"checkbox\" id=\"chkKeyboard\" checked />\n              Atalhos de teclado (WASD / Setas / Espaço)\n            </label>\n            <div style=\"font-size: 0.72rem; color: var(--text-dim);\">\n              Movimentos exigem <code>CAPTURA_MANUAL</code> e expiram localmente no Rover se não renovados. <code>PARAR</code> funciona em qualquer modo.\n            </div>\n          </div>\n        </div>\n\n        <div class=\"ack-box\" id=\"ackBox\">\n          <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n            <span style=\"color: var(--text-muted);\">ÚLTIMO ACK (`rover/cmd/ack`)</span>\n            <span class=\"badge badge-sim\" id=\"ackStatusBadge\">AGUARDANDO COMANDO</span>\n          </div>\n          <div id=\"ackDetails\" style=\"color: var(--text-main);\">Nenhum comando enviado nesta sessão.</div>\n        </div>\n      </div>\n    </section>\n\n    <!-- ALARMS & LOGS -->\n    <section class=\"feed-grid\">\n      <div class=\"panel\">\n        <div class=\"section-title\" style=\"margin-bottom: 0;\">\n          <span>Alarmes e Confirmações (`rover/alarme`, `rover/cmd/ack`)</span>\n          <button class=\"btn\" id=\"btnClearAlarms\" type=\"button\" style=\"padding: 2px 8px; font-size: 0.7rem;\">Limpar</button>\n        </div>\n        <div class=\"event-list\" id=\"alarmList\"></div>\n      </div>\n\n      <div class=\"panel\">\n        <div class=\"section-title\" style=\"margin-bottom: 0;\">\n          <span>Logs Operacionais (`rover/log`)</span>\n          <button class=\"btn\" id=\"btnClearLogs\" type=\"button\" style=\"padding: 2px 8px; font-size: 0.7rem;\">Limpar</button>\n        </div>\n        <div class=\"event-list\" id=\"logList\"></div>\n      </div>\n    </section>\n  </main>\n\n  <script>\n    (function () {\n      \"use strict\";\n\n      const VALID_NEXT = {\n        SEGURO_ESPERA: [\"BUSCA\"],\n        BUSCA: [\"APROXIMACAO\"],\n        APROXIMACAO: [\"AGUARDANDO_PEGA\"],\n        AGUARDANDO_PEGA: [\"CAPTURA_MANUAL\"],\n        CAPTURA_MANUAL: [\"BUSCA\"]\n      };\n\n      const state = {\n        wsConnected: false,\n        roverOnline: false,\n        roverReason: \"aguardando\",\n        source: \"--\",\n        lastPacketMs: null,\n        currentState: \"SEGURO_ESPERA\",\n        previousState: \"SEGURO_ESPERA\",\n        stateReason: \"inicializando\",\n        motion: \"PARAR\",\n        telemetry: {\n          battery_percent: null,\n          temperature_c: null,\n          proximity_cm: { front: null, left: null, right: null }\n        },\n        history: {\n          battery: [],\n          temperature: []\n        },\n        camMode: \"sim\",\n        webrtcPc: null,\n        simTick: 0\n      };\n\n      // DOM elements\n      const wsBadge = document.getElementById(\"wsBadge\");\n      const wsText = document.getElementById(\"wsText\");\n      const roverOnlineBadge = document.getElementById(\"roverOnlineBadge\");\n      const roverOnlineText = document.getElementById(\"roverOnlineText\");\n      const lastSeenBadge = document.getElementById(\"lastSeenBadge\");\n      const telemetrySourceLabel = document.getElementById(\"telemetrySourceLabel\");\n\n      const batteryValue = document.getElementById(\"batteryValue\");\n      const batteryBadge = document.getElementById(\"batteryBadge\");\n      const batteryVoltageEst = document.getElementById(\"batteryVoltageEst\");\n      const batteryBar = document.getElementById(\"batteryBar\");\n      const batteryMin = document.getElementById(\"batteryMin\");\n      const batteryMax = document.getElementById(\"batteryMax\");\n      const batterySamples = document.getElementById(\"batterySamples\");\n      const batterySparkline = document.getElementById(\"batterySparkline\");\n\n      const tempValue = document.getElementById(\"tempValue\");\n      const tempBadge = document.getElementById(\"tempBadge\");\n      const tempTrendLabel = document.getElementById(\"tempTrendLabel\");\n      const tempBar = document.getElementById(\"tempBar\");\n      const tempMin = document.getElementById(\"tempMin\");\n      const tempAvg = document.getElementById(\"tempAvg\");\n      const tempMax = document.getElementById(\"tempMax\");\n      const tempSparkline = document.getElementById(\"tempSparkline\");\n\n      const proxGlobalBadge = document.getElementById(\"proxGlobalBadge\");\n      const proxFrontVal = document.getElementById(\"proxFrontVal\");\n      const proxLeftVal = document.getElementById(\"proxLeftVal\");\n      const proxRightVal = document.getElementById(\"proxRightVal\");\n      const proxFrontBar = document.getElementById(\"proxFrontBar\");\n      const proxLeftBar = document.getElementById(\"proxLeftBar\");\n      const proxRightBar = document.getElementById(\"proxRightBar\");\n      const radarCanvas = document.getElementById(\"radarCanvas\");\n\n      const currentStateText = document.getElementById(\"currentStateText\");\n      const prevStateText = document.getElementById(\"prevStateText\");\n      const stateReasonText = document.getElementById(\"stateReasonText\");\n      const motionBadge = document.getElementById(\"motionBadge\");\n      const ackStatusBadge = document.getElementById(\"ackStatusBadge\");\n      const ackDetails = document.getElementById(\"ackDetails\");\n\n      const alarmList = document.getElementById(\"alarmList\");\n      const logList = document.getElementById(\"logList\");\n\n      const durationSlider = document.getElementById(\"durationSlider\");\n      const durationLabel = document.getElementById(\"durationLabel\");\n      const chkKeyboard = document.getElementById(\"chkKeyboard\");\n\n      const camConfigBar = document.getElementById(\"camConfigBar\");\n      const camUrlLabel = document.getElementById(\"camUrlLabel\");\n      const camUrlInput = document.getElementById(\"camUrlInput\");\n      const camVideo = document.getElementById(\"camVideo\");\n      const camMjpeg = document.getElementById(\"camMjpeg\");\n      const camIframe = document.getElementById(\"camIframe\");\n      const camHudCanvas = document.getElementById(\"camHudCanvas\");\n      const chkHudOverlay = document.getElementById(\"chkHudOverlay\");\n\n      function formatTime(iso) {\n        if (!iso) return new Date().toLocaleTimeString(\"pt-BR\");\n        const d = new Date(iso);\n        return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleTimeString(\"pt-BR\");\n      }\n\n      function pushEvent(container, text, level, isoTime) {\n        const div = document.createElement(\"div\");\n        div.className = \"event-item\" + (level === \"warn\" ? \" warn\" : level === \"error\" ? \" error\" : \"\");\n        const msgSpan = document.createElement(\"span\");\n        msgSpan.textContent = text;\n        const timeSpan = document.createElement(\"span\");\n        timeSpan.className = \"event-time\";\n        timeSpan.textContent = formatTime(isoTime);\n        div.appendChild(msgSpan);\n        div.appendChild(timeSpan);\n        container.prepend(div);\n        while (container.children.length > 40) {\n          container.removeChild(container.lastChild);\n        }\n      }\n\n      function drawSparkline(canvas, values, strokeColor, fillColor, minRef, maxRef) {\n        const ctx = canvas.getContext(\"2d\");\n        const w = canvas.width;\n        const h = canvas.height;\n        ctx.clearRect(0, 0, w, h);\n\n        // Grid lines\n        ctx.strokeStyle = \"rgba(148, 163, 184, 0.12)\";\n        ctx.lineWidth = 1;\n        for (let i = 1; i <= 2; i++) {\n          const y = (h / 3) * i;\n          ctx.beginPath();\n          ctx.moveTo(0, y);\n          ctx.lineTo(w, y);\n          ctx.stroke();\n        }\n\n        if (!values || values.length === 0) return;\n\n        const minVal = minRef !== undefined ? Math.min(minRef, ...values) : Math.min(...values) - 0.5;\n        const maxVal = maxRef !== undefined ? Math.max(maxRef, ...values) : Math.max(...values) + 0.5;\n        const span = Math.max(0.01, maxVal - minVal);\n\n        const pts = values.map((v, idx) => {\n          const x = values.length === 1 ? w / 2 : (idx / (values.length - 1)) * (w - 8) + 4;\n          const y = h - 6 - ((v - minVal) / span) * (h - 12);\n          return [x, y];\n        });\n\n        ctx.beginPath();\n        pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));\n        ctx.strokeStyle = strokeColor;\n        ctx.lineWidth = 2;\n        ctx.stroke();\n\n        ctx.lineTo(pts[pts.length - 1][0], h);\n        ctx.lineTo(pts[0][0], h);\n        ctx.closePath();\n        ctx.fillStyle = fillColor;\n        ctx.fill();\n      }\n\n      function proxColor(cm) {\n        if (!Number.isFinite(cm)) return \"#38bdf8\";\n        if (cm < 50) return \"#ef4444\";\n        if (cm < 100) return \"#f59e0b\";\n        return \"#10b981\";\n      }\n\n      function drawRadar() {\n        const ctx = radarCanvas.getContext(\"2d\");\n        const w = radarCanvas.width;\n        const h = radarCanvas.height;\n        const cx = w / 2;\n        const cy = h - 24;\n        const maxR = 110;\n\n        ctx.clearRect(0, 0, w, h);\n\n        // Concentric range arcs (50, 100, 150, 200 cm)\n        ctx.strokeStyle = \"rgba(56, 189, 248, 0.18)\";\n        ctx.lineWidth = 1;\n        [0.25, 0.5, 0.75, 1.0].forEach((ratio) => {\n          ctx.beginPath();\n          ctx.arc(cx, cy, maxR * ratio, Math.PI, 0, false);\n          ctx.stroke();\n        });\n\n        // Crosshairs\n        ctx.beginPath();\n        ctx.moveTo(cx - maxR, cy);\n        ctx.lineTo(cx + maxR, cy);\n        ctx.moveTo(cx, cy);\n        ctx.lineTo(cx, cy - maxR);\n        ctx.stroke();\n\n        const p = state.telemetry.proximity_cm || {};\n        const sectors = [\n          { val: p.front, start: -Math.PI * 0.65, end: -Math.PI * 0.35 },\n          { val: p.left, start: -Math.PI * 0.98, end: -Math.PI * 0.72 },\n          { val: p.right, start: -Math.PI * 0.28, end: -Math.PI * 0.02 }\n        ];\n\n        sectors.forEach((s) => {\n          if (!Number.isFinite(s.val)) return;\n          const clamped = Math.max(10, Math.min(200, s.val));\n          const r = (clamped / 200) * maxR;\n          const color = proxColor(s.val);\n\n          ctx.beginPath();\n          ctx.moveTo(cx, cy);\n          ctx.arc(cx, cy, r, s.start, s.end, false);\n          ctx.closePath();\n          ctx.fillStyle = color + \"28\";\n          ctx.fill();\n\n          ctx.beginPath();\n          ctx.arc(cx, cy, r, s.start, s.end, false);\n          ctx.strokeStyle = color;\n          ctx.lineWidth = 3.5;\n          ctx.stroke();\n        });\n\n        // Rover body\n        ctx.fillStyle = \"#38bdf8\";\n        ctx.fillRect(cx - 8, cy - 10, 16, 20);\n        ctx.strokeStyle = \"#0284c7\";\n        ctx.strokeRect(cx - 8, cy - 10, 16, 20);\n      }\n\n      function updateTelemetryUI(envelope) {\n        const d = envelope.data || {};\n        state.source = envelope.source || state.source;\n        telemetrySourceLabel.textContent = \"origem: \" + state.source + \" • \" + formatTime(envelope.timestamp);\n\n        let bat = Number(d.battery_percent);\n        const voltageDirect = Number(d.battery_voltage_v);\n        if (!Number.isFinite(bat) && Number.isFinite(voltageDirect)) {\n          bat = Math.max(0, Math.min(100, ((voltageDirect - 9.6) / 3.0) * 100));\n        }\n        const temp = Number(d.temperature_c);\n        const prox = d.proximity_cm || {};\n\n        if (Number.isFinite(bat)) {\n          state.telemetry.battery_percent = bat;\n          state.history.battery.push(bat);\n          if (state.history.battery.length > 60) state.history.battery.shift();\n\n          batteryValue.textContent = bat.toFixed(2);\n          const voltage = Number.isFinite(voltageDirect) ? voltageDirect : 9.6 + (bat / 100) * 3.0;\n          batteryVoltageEst.textContent = \"~ \" + voltage.toFixed(2) + \" V (LiPo 3S sim)\";\n          batteryBar.style.width = Math.max(0, Math.min(100, bat)) + \"%\";\n\n          if (bat < 20) {\n            batteryBadge.className = \"badge badge-danger\";\n            batteryBadge.textContent = \"CRÍTICA\";\n            batteryBar.style.background = \"#ef4444\";\n          } else if (bat < 50) {\n            batteryBadge.className = \"badge badge-warn\";\n            batteryBadge.textContent = \"ATENÇÃO\";\n            batteryBar.style.background = \"#f59e0b\";\n          } else {\n            batteryBadge.className = \"badge badge-ok\";\n            batteryBadge.textContent = \"NOMINAL\";\n            batteryBar.style.background = \"linear-gradient(90deg, #10b981, #34d399)\";\n          }\n\n          const bArr = state.history.battery;\n          batteryMin.textContent = \"Mín: \" + Math.min(...bArr).toFixed(2) + \"%\";\n          batteryMax.textContent = \"Máx: \" + Math.max(...bArr).toFixed(2) + \"%\";\n          batterySamples.textContent = \"Amostras: \" + bArr.length;\n          drawSparkline(batterySparkline, bArr, \"#10b981\", \"rgba(16, 185, 129, 0.16)\");\n        }\n\n        if (Number.isFinite(temp)) {\n          state.telemetry.temperature_c = temp;\n          state.history.temperature.push(temp);\n          if (state.history.temperature.length > 60) state.history.temperature.shift();\n\n          tempValue.textContent = temp.toFixed(1);\n          const pct = Math.max(0, Math.min(100, ((temp - 20) / 40) * 100));\n          tempBar.style.width = pct + \"%\";\n\n          if (temp >= 47.5) {\n            tempBadge.className = \"badge badge-danger\";\n            tempBadge.textContent = \"ALTA\";\n            tempBar.style.background = \"#ef4444\";\n          } else if (temp >= 45.0) {\n            tempBadge.className = \"badge badge-warn\";\n            tempBadge.textContent = \"ELEVADA\";\n            tempBar.style.background = \"#f59e0b\";\n          } else {\n            tempBadge.className = \"badge badge-ok\";\n            tempBadge.textContent = \"NORMAL\";\n            tempBar.style.background = \"linear-gradient(90deg, #38bdf8, #10b981)\";\n          }\n\n          const tArr = state.history.temperature;\n          const avg = tArr.reduce((a, b) => a + b, 0) / tArr.length;\n          tempMin.textContent = \"Mín: \" + Math.min(...tArr).toFixed(1) + \" °C\";\n          tempAvg.textContent = \"Méd: \" + avg.toFixed(1) + \" °C\";\n          tempMax.textContent = \"Máx: \" + Math.max(...tArr).toFixed(1) + \" °C\";\n          tempTrendLabel.textContent = \"Média recente: \" + avg.toFixed(1) + \" °C\";\n          drawSparkline(tempSparkline, tArr, \"#38bdf8\", \"rgba(56, 189, 248, 0.16)\", 36, 50);\n        }\n\n        const f = Number(prox.front);\n        const l = Number(prox.left);\n        const r = Number(prox.right);\n        state.telemetry.proximity_cm = { front: f, left: l, right: r };\n\n        const updateProxBar = (valEl, barEl, val) => {\n          if (!Number.isFinite(val)) return;\n          valEl.textContent = val.toFixed(1) + \" cm\";\n          valEl.style.color = proxColor(val);\n          barEl.style.width = Math.max(2, Math.min(100, (val / 200) * 100)) + \"%\";\n          barEl.style.background = proxColor(val);\n        };\n\n        updateProxBar(proxFrontVal, proxFrontBar, f);\n        updateProxBar(proxLeftVal, proxLeftBar, l);\n        updateProxBar(proxRightVal, proxRightBar, r);\n\n        const minProx = Math.min(\n          Number.isFinite(f) ? f : 999,\n          Number.isFinite(l) ? l : 999,\n          Number.isFinite(r) ? r : 999\n        );\n\n        if (minProx < 50) {\n          proxGlobalBadge.className = \"badge badge-danger\";\n          proxGlobalBadge.textContent = \"OBSTÁCULO PRÓXIMO (<50cm)\";\n        } else if (minProx < 100) {\n          proxGlobalBadge.className = \"badge badge-warn\";\n          proxGlobalBadge.textContent = \"ATENÇÃO (50–100cm)\";\n        } else {\n          proxGlobalBadge.className = \"badge badge-ok\";\n          proxGlobalBadge.textContent = \"CAMINHO LIVRE\";\n        }\n\n        drawRadar();\n      }\n\n      function updateStateUI(envelope) {\n        const d = envelope.data || {};\n        state.currentState = d.state || state.currentState;\n        state.previousState = d.previous_state || state.previousState;\n        state.stateReason = d.reason || (d.hardware_actuation === false ? \"validação sem atuação física\" : state.stateReason);\n        state.motion = d.motion || \"PARAR\";\n\n        currentStateText.textContent = state.currentState;\n        prevStateText.textContent = \"anterior: \" + state.previousState;\n        stateReasonText.textContent = \"motivo: \" + state.stateReason;\n\n        motionBadge.textContent = \"MOVIMENTO: \" + state.motion;\n        motionBadge.className = state.motion === \"PARAR\" ? \"badge badge-sim\" : \"badge badge-warn\";\n\n        const nextValid = VALID_NEXT[state.currentState] || [];\n        document.querySelectorAll(\".mode-btn\").forEach((btn) => {\n          const m = btn.getAttribute(\"data-mode\");\n          btn.classList.toggle(\"active-state\", m === state.currentState);\n          btn.classList.toggle(\"next-valid\", m !== state.currentState && nextValid.includes(m));\n        });\n      }\n\n      function updateStatusUI(envelope) {\n        const d = envelope.data || {};\n        state.roverOnline = Boolean(d.online);\n        state.roverReason = d.reason || d.mode || (d.hostname ? \"host=\" + d.hostname : \"\");\n        const simBadge = document.getElementById(\"simBadge\");\n        if (simBadge) {\n          simBadge.textContent = envelope.simulated === false ? \"PI 3 MQTT • SEM ATUAÇÃO FÍSICA\" : \"SIMULAÇÃO v1.0\";\n        }\n        if (state.roverOnline) {\n          roverOnlineBadge.className = \"badge badge-ok\";\n          const hostInfo = d.hostname ? \" • \" + d.hostname : \"\";\n          roverOnlineText.textContent = \"ROVER: ONLINE (\" + (envelope.source || \"sim\") + hostInfo + \")\";\n        } else {\n          roverOnlineBadge.className = \"badge badge-danger\";\n          roverOnlineText.textContent = \"ROVER: OFFLINE (\" + (state.roverReason || \"desconectado\") + \")\";\n        }\n      }\n\n      function updateAckUI(envelope) {\n        const d = envelope.data || {};\n        const ok = Boolean(d.accepted);\n        ackStatusBadge.className = ok ? \"badge badge-ok\" : \"badge badge-danger\";\n        ackStatusBadge.textContent = ok ? \"ACEITO (\" + d.reason + \")\" : \"REJEITADO (\" + d.reason + \")\";\n        const topicOrExec = d.topic ? \"Tópico: \" + d.topic : \"Execução: \" + (d.execution || \"simulated_only\");\n        ackDetails.textContent =\n          topicOrExec +\n          \" | Estado: \" + d.state +\n          (d.duplicate ? \" (DUPLICATA)\" : \"\") +\n          (d.command_id ? \" | ID: \" + String(d.command_id).slice(0, 8) + \"…\" : \"\");\n\n        pushEvent(\n          alarmList,\n          \"[ACK] \" + (ok ? \"ACEITO\" : \"REJEITADO\") + \" • \" + d.reason + \" → estado=\" + d.state,\n          ok ? \"info\" : \"warn\",\n          envelope.timestamp\n        );\n      }\n\n      function handleEnvelope(envelope) {\n        if (!envelope || typeof envelope !== \"object\") return;\n        state.lastPacketMs = Date.now();\n\n        switch (envelope.type) {\n          case \"telemetry\":\n            updateTelemetryUI(envelope);\n            break;\n          case \"state\":\n            updateStateUI(envelope);\n            break;\n          case \"status\":\n            updateStatusUI(envelope);\n            break;\n          case \"ack\":\n            updateAckUI(envelope);\n            break;\n          case \"alarm\": {\n            const d = envelope.data || {};\n            pushEvent(\n              alarmList,\n              \"[ALARME • \" + (d.code || \"ALERTA\") + \"] \" + (d.message || \"\"),\n              d.severity === \"critical\" ? \"error\" : \"warn\",\n              envelope.timestamp\n            );\n            break;\n          }\n          case \"log\": {\n            const d = envelope.data || {};\n            pushEvent(\n              logList,\n              \"[\" + (d.level || \"INFO\") + \" • \" + (d.event || \"log\") + \"] \" + (d.message || \"\"),\n              d.level === \"ERROR\" ? \"error\" : d.level === \"WARNING\" ? \"warn\" : \"info\",\n              envelope.timestamp\n            );\n            break;\n          }\n        }\n      }\n\n      // Send Command via WebSocket or HTTP fallback\n      let ws = null;\n\n      function sendCommand(payloadObj) {\n        if (ws && ws.readyState === WebSocket.OPEN) {\n          ws.send(JSON.stringify(payloadObj));\n          return;\n        }\n        fetch(\"/api/rover/command\", {\n          method: \"POST\",\n          headers: { \"Content-Type\": \"application/json\" },\n          body: JSON.stringify(payloadObj)\n        }).catch((err) => {\n          console.error(\"Falha ao enviar comando HTTP:\", err);\n        });\n      }\n\n      function sendMode(mode) {\n        sendCommand({ kind: \"mode\", mode: mode });\n      }\n\n      function sendManual(action) {\n        const duration = parseInt(durationSlider.value, 10) || 500;\n        sendCommand({ kind: \"manual\", action: action, duration_ms: duration });\n      }\n\n      // Connect WebSocket & fetch initial snapshot\n      function loadSnapshot() {\n        fetch(\"/api/rover/snapshot\")\n          .then((r) => (r.ok ? r.json() : null))\n          .then((snap) => {\n            if (!snap) return;\n            if (Array.isArray(snap.history)) {\n              state.history.battery = snap.history\n                .map((h) => Number(h.battery_percent))\n                .filter(Number.isFinite);\n              state.history.temperature = snap.history\n                .map((h) => Number(h.temperature_c))\n                .filter(Number.isFinite);\n            }\n            if (snap.status) handleEnvelope(snap.status);\n            if (snap.state) handleEnvelope(snap.state);\n            if (snap.telemetry) handleEnvelope(snap.telemetry);\n            if (snap.last_ack) updateAckUI(snap.last_ack);\n            if (Array.isArray(snap.alarms)) {\n              snap.alarms.slice().reverse().forEach(handleEnvelope);\n            }\n            if (Array.isArray(snap.logs)) {\n              snap.logs.slice().reverse().forEach(handleEnvelope);\n            }\n          })\n          .catch(() => {});\n      }\n\n      function connectWebSocket() {\n        const proto = window.location.protocol === \"https:\" ? \"wss:\" : \"ws:\";\n        const url = proto + \"//\" + window.location.host + \"/ws/rover\";\n        ws = new WebSocket(url);\n\n        ws.onopen = function () {\n          state.wsConnected = true;\n          wsBadge.className = \"badge badge-ok\";\n          wsText.textContent = \"WS: Conectado\";\n          loadSnapshot();\n        };\n\n        ws.onmessage = function (ev) {\n          try {\n            const msg = JSON.parse(ev.data);\n            handleEnvelope(msg);\n          } catch (_) {}\n        };\n\n        ws.onclose = function () {\n          state.wsConnected = false;\n          wsBadge.className = \"badge badge-warn\";\n          wsText.textContent = \"WS: Reconectando...\";\n          setTimeout(connectWebSocket, 1500);\n        };\n\n        ws.onerror = function () {\n          try {\n            ws.close();\n          } catch (_) {}\n        };\n      }\n\n      // Hybrid Camera Controller (Sim HUD + WebRTC WHEP + WebRTC Iframe + MJPEG)\n      function stopRealStreams() {\n        if (state.webrtcPc) {\n          try {\n            state.webrtcPc.close();\n          } catch (_) {}\n          state.webrtcPc = null;\n        }\n        camVideo.srcObject = null;\n        camVideo.style.display = \"none\";\n        camMjpeg.removeAttribute(\"src\");\n        camMjpeg.style.display = \"none\";\n        camIframe.src = \"about:blank\";\n        camIframe.style.display = \"none\";\n      }\n\n      async function connectWebRtcWhep(whepUrl) {\n        stopRealStreams();\n        camVideo.style.display = \"block\";\n        try {\n          const pc = new RTCPeerConnection({\n            iceServers: [{ urls: \"stun:stun.l.google.com:19302\" }]\n          });\n          state.webrtcPc = pc;\n          pc.addTransceiver(\"video\", { direction: \"recvonly\" });\n          pc.ontrack = (event) => {\n            if (event.streams && event.streams[0]) {\n              camVideo.srcObject = event.streams[0];\n            }\n          };\n          const offer = await pc.createOffer();\n          await pc.setLocalDescription(offer);\n\n          const res = await fetch(whepUrl, {\n            method: \"POST\",\n            headers: { \"Content-Type\": \"application/sdp\" },\n            body: pc.localDescription.sdp\n          });\n          if (!res.ok) throw new Error(\"HTTP \" + res.status);\n          const answerSdp = await res.text();\n          await pc.setRemoteDescription({ type: \"answer\", sdp: answerSdp });\n          pushEvent(logList, \"[CAMERA] WebRTC WHEP conectado em \" + whepUrl, \"info\");\n        } catch (err) {\n          pushEvent(\n            alarmList,\n            \"[CAMERA] Falha ao negociar WebRTC WHEP (\" + err.message + \"). Verifique se MediaMTX/go2rtc está ativo.\",\n            \"warn\"\n          );\n        }\n      }\n\n      function setCameraMode(mode) {\n        state.camMode = mode;\n        document.querySelectorAll(\"[data-cam-mode]\").forEach((b) => {\n          b.classList.toggle(\"active\", b.getAttribute(\"data-cam-mode\") === mode);\n        });\n\n        stopRealStreams();\n\n        if (mode === \"sim\") {\n          camConfigBar.style.display = \"none\";\n          camHudCanvas.style.display = \"block\";\n        } else {\n          camConfigBar.style.display = \"flex\";\n          camHudCanvas.style.display = chkHudOverlay.checked ? \"block\" : \"none\";\n          const saved = localStorage.getItem(\"rover_cam_url_\" + mode);\n          if (mode === \"webrtc\") {\n            camUrlLabel.textContent = \"Endpoint WHEP:\";\n            camUrlInput.value = saved || \"http://192.168.1.50:8889/rover/whep\";\n          } else if (mode === \"iframe\") {\n            camUrlLabel.textContent = \"URL Player WebRTC:\";\n            camUrlInput.value = saved || \"http://192.168.1.50:8889/rover\";\n          } else if (mode === \"mjpeg\") {\n            camUrlLabel.textContent = \"URL Stream MJPEG:\";\n            camUrlInput.value = saved || \"http://192.168.1.50:8080/?action=stream\";\n          }\n        }\n      }\n\n      document.querySelectorAll(\"[data-cam-mode]\").forEach((btn) => {\n        btn.addEventListener(\"click\", () => setCameraMode(btn.getAttribute(\"data-cam-mode\")));\n      });\n\n      document.getElementById(\"btnCamConnect\").addEventListener(\"click\", () => {\n        const url = camUrlInput.value.trim();\n        if (!url) return;\n        localStorage.setItem(\"rover_cam_url_\" + state.camMode, url);\n        if (state.camMode === \"webrtc\") {\n          connectWebRtcWhep(url);\n        } else if (state.camMode === \"iframe\") {\n          stopRealStreams();\n          camIframe.style.display = \"block\";\n          camIframe.src = url;\n        } else if (state.camMode === \"mjpeg\") {\n          stopRealStreams();\n          camMjpeg.style.display = \"block\";\n          camMjpeg.src = url;\n        }\n      });\n\n      document.getElementById(\"btnCamDisconnect\").addEventListener(\"click\", stopRealStreams);\n\n      chkHudOverlay.addEventListener(\"change\", () => {\n        if (state.camMode !== \"sim\") {\n          camHudCanvas.style.display = chkHudOverlay.checked ? \"block\" : \"none\";\n        }\n      });\n\n      // Render Simulated Camera & Tactical HUD Overlay\n      function renderCameraHud() {\n        const ctx = camHudCanvas.getContext(\"2d\");\n        const w = camHudCanvas.width;\n        const h = camHudCanvas.height;\n        ctx.clearRect(0, 0, w, h);\n\n        if (state.motion === \"AVANCAR\") state.simTick += 2.2;\n        else if (state.motion === \"RECUAR\") state.simTick -= 2.2;\n        else if (state.state !== \"SEGURO_ESPERA\") state.simTick += 0.45;\n\n        // Synthetic background when in Simulator mode\n        if (state.camMode === \"sim\") {\n          const sky = ctx.createLinearGradient(0, 0, 0, h * 0.52);\n          sky.addColorStop(0, \"#060b16\");\n          sky.addColorStop(1, \"#0f1e36\");\n          ctx.fillStyle = sky;\n          ctx.fillRect(0, 0, w, h * 0.52);\n\n          const ground = ctx.createLinearGradient(0, h * 0.52, 0, h);\n          ground.addColorStop(0, \"#0b1526\");\n          ground.addColorStop(1, \"#050911\");\n          ctx.fillStyle = ground;\n          ctx.fillRect(0, h * 0.52, w, h * 0.48);\n\n          // Perspective grid\n          const horizon = h * 0.52;\n          ctx.strokeStyle = \"rgba(56, 189, 248, 0.2)\";\n          ctx.lineWidth = 1;\n          for (let i = -8; i <= 8; i++) {\n            ctx.beginPath();\n            ctx.moveTo(w / 2 + i * 18, horizon);\n            ctx.lineTo(w / 2 + i * 120, h);\n            ctx.stroke();\n          }\n\n          const offset = ((state.simTick % 20) + 20) % 20;\n          for (let d = 1; d <= 7; d++) {\n            const norm = (d * 20 - offset) / 140;\n            const y = horizon + Math.pow(norm, 1.5) * (h - horizon);\n            ctx.beginPath();\n            ctx.moveTo(0, y);\n            ctx.lineTo(w, y);\n            ctx.stroke();\n          }\n\n          // Simulated target box based on state machine\n          if (state.currentState !== \"SEGURO_ESPERA\") {\n            const boxSize =\n              state.currentState === \"BUSCA\"\n                ? 70\n                : state.currentState === \"APROXIMACAO\"\n                ? 115\n                : 150;\n            const wobble =\n              state.currentState === \"BUSCA\" ? Math.sin(Date.now() / 600) * 90 : 0;\n            const bx = w / 2 - boxSize / 2 + wobble;\n            const by = horizon - boxSize * 0.35;\n\n            ctx.strokeStyle =\n              state.currentState === \"CAPTURA_MANUAL\" ? \"#10b981\" : \"#f59e0b\";\n            ctx.lineWidth = 2;\n            ctx.strokeRect(bx, by, boxSize, boxSize);\n\n            ctx.fillStyle = \"rgba(15, 23, 42, 0.85)\";\n            ctx.fillRect(bx, by - 22, boxSize, 20);\n            ctx.fillStyle = \"#f8fafc\";\n            ctx.font = \"bold 11px monospace\";\n            ctx.fillText(\"ALVO SIMULADO [\" + state.currentState + \"]\", bx + 6, by - 8);\n          }\n        }\n\n        // HUD Overlay (crosshair + telemetry readouts)\n        ctx.strokeStyle = \"rgba(56, 189, 248, 0.65)\";\n        ctx.lineWidth = 1.5;\n        ctx.beginPath();\n        ctx.arc(w / 2, h / 2, 26, 0, Math.PI * 2);\n        ctx.moveTo(w / 2 - 42, h / 2);\n        ctx.lineTo(w / 2 - 12, h / 2);\n        ctx.moveTo(w / 2 + 12, h / 2);\n        ctx.lineTo(w / 2 + 42, h / 2);\n        ctx.moveTo(w / 2, h / 2 - 42);\n        ctx.lineTo(w / 2, h / 2 - 12);\n        ctx.moveTo(w / 2, h / 2 + 12);\n        ctx.lineTo(w / 2, h / 2 + 42);\n        ctx.stroke();\n\n        // Top HUD bar\n        ctx.fillStyle = \"rgba(9, 13, 22, 0.72)\";\n        ctx.fillRect(14, 14, w - 28, 32);\n        ctx.fillStyle = \"#38bdf8\";\n        ctx.font = \"bold 12px monospace\";\n        const batTxt =\n          state.telemetry.battery_percent !== null\n            ? state.telemetry.battery_percent.toFixed(1) + \"%\"\n            : \"--%\";\n        const tmpTxt =\n          state.telemetry.temperature_c !== null\n            ? state.telemetry.temperature_c.toFixed(1) + \"°C\"\n            : \"--°C\";\n        const frTxt =\n          state.telemetry.proximity_cm.front !== null\n            ? state.telemetry.proximity_cm.front.toFixed(0) + \"cm\"\n            : \"--cm\";\n        ctx.fillText(\n          \"MODO: \" +\n            state.currentState +\n            \"   |   MOV: \" +\n            state.motion +\n            \"   |   BAT: \" +\n            batTxt +\n            \"   |   TEMP: \" +\n            tmpTxt +\n            \"   |   FRENTE: \" +\n            frTxt,\n          26,\n          34\n        );\n\n        requestAnimationFrame(renderCameraHud);\n      }\n\n      // Bind Controls\n      document.querySelectorAll(\".mode-btn\").forEach((btn) => {\n        btn.addEventListener(\"click\", () => sendMode(btn.getAttribute(\"data-mode\")));\n      });\n\n      document.querySelectorAll(\".dpad-btn\").forEach((btn) => {\n        btn.addEventListener(\"click\", () => sendManual(btn.getAttribute(\"data-action\")));\n      });\n\n      document.getElementById(\"btnEmergencyTop\").addEventListener(\"click\", () => {\n        sendManual(\"PARAR\");\n      });\n\n      durationSlider.addEventListener(\"input\", () => {\n        durationLabel.textContent = durationSlider.value + \" ms\";\n      });\n\n      document.getElementById(\"btnClearAlarms\").addEventListener(\"click\", () => {\n        alarmList.innerHTML = \"\";\n      });\n\n      document.getElementById(\"btnClearLogs\").addEventListener(\"click\", () => {\n        logList.innerHTML = \"\";\n      });\n\n      window.addEventListener(\"keydown\", (ev) => {\n        if (!chkKeyboard.checked) return;\n        const tag = (ev.target && ev.target.tagName) || \"\";\n        if (tag === \"INPUT\" || tag === \"TEXTAREA\" || tag === \"SELECT\") return;\n\n        const key = ev.key.toLowerCase();\n        let action = null;\n        if (key === \" \" || key === \"escape\") action = \"PARAR\";\n        else if (key === \"w\" || key === \"arrowup\") action = \"AVANCAR\";\n        else if (key === \"s\" || key === \"arrowdown\") action = \"RECUAR\";\n        else if (key === \"a\" || key === \"arrowleft\") action = \"ESQUERDA\";\n        else if (key === \"d\" || key === \"arrowright\") action = \"DIREITA\";\n\n        if (action) {\n          ev.preventDefault();\n          sendManual(action);\n        }\n      });\n\n      // Age ticker\n      setInterval(() => {\n        if (!state.lastPacketMs) {\n          lastSeenBadge.textContent = \"Último pacote: aguardando\";\n          return;\n        }\n        const sec = ((Date.now() - state.lastPacketMs) / 1000).toFixed(1);\n        lastSeenBadge.textContent = \"Último pacote: há \" + sec + \"s\";\n      }, 300);\n\n      drawRadar();\n      connectWebSocket();\n      requestAnimationFrame(renderCameraHud);\n    })();\n  </script>\n</body>\n</html>\n",
+    "output": "str",
+    "x": 430,
+    "y": 960,
+    "wires": [
+      [
+        "dashboard-http-out"
+      ]
+    ]
+  },
+  {
+    "id": "dashboard-http-out",
+    "type": "http response",
+    "z": "rover-tab",
+    "name": "200 HTML",
+    "statusCode": "200",
+    "headers": {
+      "content-type": "text/html; charset=utf-8"
+    },
+    "x": 700,
+    "y": 960,
+    "wires": []
+  },
+  {
+    "id": "snapshot-http-in",
+    "type": "http in",
+    "z": "rover-tab",
+    "name": "GET /api/rover/snapshot",
+    "url": "/api/rover/snapshot",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 180,
+    "y": 1020,
+    "wires": [
+      [
+        "snapshot-fn"
+      ]
+    ]
+  },
+  {
+    "id": "snapshot-fn",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Ler snapshot atual",
+    "func": "const snap = flow.get(\"rover_snapshot\") || {\n  telemetry: null, state: null, status: null, last_ack: null,\n  history: [], alarms: [], logs: []\n};\nmsg.payload = JSON.stringify({\n  version: \"1.0\",\n  simulated: true,\n  station_source: env.get(\"STATION_SOURCE\") || \"station-nodered\",\n  timestamp: new Date().toISOString(),\n  ...snap\n});\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 440,
+    "y": 1020,
+    "wires": [
+      [
+        "snapshot-http-out"
+      ]
+    ]
+  },
+  {
+    "id": "snapshot-http-out",
+    "type": "http response",
+    "z": "rover-tab",
+    "name": "200 JSON",
+    "statusCode": "200",
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "x": 700,
+    "y": 1020,
+    "wires": []
+  },
+  {
+    "id": "cmd-http-in",
+    "type": "http in",
+    "z": "rover-tab",
+    "name": "POST /api/rover/command",
+    "url": "/api/rover/command",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 180,
+    "y": 1080,
+    "wires": [
+      [
+        "cmd-http-fn"
+      ]
+    ]
+  },
+  {
+    "id": "cmd-http-fn",
+    "type": "function",
+    "z": "rover-tab",
+    "name": "Validar comando HTTP",
+    "func": "const b = msg.payload || {};\nconst modes = [\"SEGURO_ESPERA\",\"BUSCA\",\"APROXIMACAO\",\"AGUARDANDO_PEGA\",\"CAPTURA_MANUAL\"];\nconst actions = [\"PARAR\",\"AVANCAR\",\"RECUAR\",\"ESQUERDA\",\"DIREITA\"];\nif (b.kind === \"mode\" && modes.includes(b.mode)) {\n  const cmdMsg = { topic: \"rover/cmd/modo\", payload: b.mode };\n  msg.statusCode = 202;\n  msg.payload = JSON.stringify({ accepted_by_station: true, topic: \"rover/cmd/modo\", mode: b.mode });\n  return [cmdMsg, msg];\n}\nif (b.kind === \"manual\" && actions.includes(b.action)) {\n  const d = Number(b.duration_ms);\n  const dur = Number.isInteger(d) && d >= 100 && d <= 1000 ? d : 500;\n  const cmdMsg = { topic: \"rover/cmd/manual\", payload: b.action, duration_ms: dur };\n  msg.statusCode = 202;\n  msg.payload = JSON.stringify({ accepted_by_station: true, topic: \"rover/cmd/manual\", action: b.action, duration_ms: dur });\n  return [cmdMsg, msg];\n}\nmsg.statusCode = 400;\nmsg.payload = JSON.stringify({ accepted_by_station: false, error: \"INVALID_COMMAND_REQUEST\" });\nreturn [null, msg];",
+    "outputs": 2,
+    "noerr": 0,
+    "x": 450,
+    "y": 1080,
+    "wires": [
+      [
+        "command"
+      ],
+      [
+        "cmd-http-out"
+      ]
+    ]
+  },
+  {
+    "id": "cmd-http-out",
+    "type": "http response",
+    "z": "rover-tab",
+    "name": "HTTP Cmd Resp",
+    "statusCode": "",
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "x": 710,
+    "y": 1080,
+    "wires": []
+  },
+  {
+    "id": "inject-recuar",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "RECUAR (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "RECUAR",
+    "payloadType": "str",
+    "x": 180,
+    "y": 790,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-esquerda",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "ESQUERDA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "ESQUERDA",
+    "payloadType": "str",
+    "x": 460,
+    "y": 740,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  },
+  {
+    "id": "inject-direita",
+    "type": "inject",
+    "z": "rover-tab",
+    "name": "DIREITA (simulado)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rover/cmd/manual",
+    "payload": "DIREITA",
+    "payloadType": "str",
+    "x": 450,
+    "y": 800,
+    "wires": [
+      [
+        "command"
+      ]
+    ]
+  }
+]
