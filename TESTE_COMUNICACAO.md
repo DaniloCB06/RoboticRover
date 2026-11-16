@@ -257,8 +257,7 @@ docker compose up -d --force-recreate node-red-init node-red
 
 Na Dashboard você poderá:
 
-- Acompanhar **bateria (%)**, **temperatura (°C)** com gráficos em tempo real e o
-  **Radar 2D de Proximidade** (`front`, `left`, `right` em cm).
+- Acompanhar **bateria (%)** e **temperatura (°C)** com gráficos em tempo real.
 - Alternar a câmera entre **Simulador HUD**, **WebRTC (WHEP)**, **WebRTC (Iframe)**
   e **MJPEG HTTP**.
 - Comandar os modos (`BUSCA → APROXIMACAO → AGUARDANDO_PEGA → CAPTURA_MANUAL`) e

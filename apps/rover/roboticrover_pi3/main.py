@@ -155,7 +155,6 @@ class RoverMqtt:
                         self._publish("rover/telemetria", "telemetry", {
                             "battery_voltage_v": 11.1,
                             "temperature_c": 25.0,
-                            "proximity_cm": None,
                             "hardware_actuation": False,
                             "note": "VALORES ARTIFICIAIS / SENSOR NÃO CONECTADO",
                         }, simulated=True)

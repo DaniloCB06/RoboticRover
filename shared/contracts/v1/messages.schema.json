@@ -114,38 +114,11 @@
               "type": "number",
               "minimum": -40,
               "maximum": 125
-            },
-            "proximity_cm": {
-              "type": "object",
-              "properties": {
-                "front": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1000
-                },
-                "left": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1000
-                },
-                "right": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1000
-                }
-              },
-              "required": [
-                "front",
-                "left",
-                "right"
-              ],
-              "additionalProperties": false
             }
           },
           "required": [
             "battery_percent",
-            "temperature_c",
-            "proximity_cm"
+            "temperature_c"
           ],
           "additionalProperties": false
         }

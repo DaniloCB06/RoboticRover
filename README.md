@@ -285,7 +285,7 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
 
 | Recurso | URL | Descrição |
 | --- | --- | --- |
-| **Dashboard do Operador** | <http://127.0.0.1:1880/dashboard> | Painel completo de telemetria, radar, câmera híbrida e comandos |
+| **Dashboard do Operador** | <http://127.0.0.1:1880/dashboard> | Painel completo de telemetria, câmera híbrida e comandos |
 | **Editor de Fluxos Node-RED** | <http://127.0.0.1:1880/#flow/rover-tab> | Fluxo MQTT visual, botões Inject e aba Debug |
 | **Snapshot JSON (API REST)** | <http://127.0.0.1:1880/api/rover/snapshot> | Estado atual, última telemetria e histórico recente em JSON |
 | **WebSocket da Dashboard** | `ws://127.0.0.1:1880/ws/rover` | Stream bidirecional de envelopes MQTT e comandos |
@@ -300,7 +300,6 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
 2. **Visualizar a Telemetria em Tempo Real (`rover/telemetria`):**
    - **Carga da Bateria:** observe o percentual (`%`), a estimativa de tensão LiPo 3S e o gráfico histórico (*sparkline*) sendo desenhado a cada segundo.
    - **Temperatura Interna:** acompanhe a variação simulada (`38–49 °C`), os indicadores de `Mín`, `Méd`, `Máx` e a curva histórica.
-   - **Sensores de Proximidade (`front`, `left`, `right`):** observe o **Radar 2D Top-Down** e as barras de distância em centímetros mudando de cor conforme a proximidade (`> 100 cm` verde, `50–100 cm` âmbar, `< 50 cm` vermelho).
 
 3. **Testar o Painel Híbrido de Câmera:**
    - **Simulador HUD (padrão sem hardware):** exibe o horizonte artificial em perspectiva 3D, mira tática, dados de telemetria no topo e um alvo simulado que reage ao modo operacional do Rover.
@@ -344,7 +343,7 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
   ```bash
   .venv/bin/python -m pytest -q
   ```
-*(Resultado esperado: **125 aprovados** e **8 ignorados**, referentes aos testes de integração real).*
+*(Resultado esperado: **126 aprovados** e **8 ignorados**, referentes aos testes de integração real).*
 
 Também é possível rodar isoladamente a suíte `unittest` do pacote da Raspberry Pi 3:
 ```bash
@@ -462,10 +461,12 @@ As opções estão documentadas em [.env.example](.env.example):
 
 Schema completo (JSON Schema Draft 2020-12) em [shared/contracts/v1/messages.schema.json](shared/contracts/v1/messages.schema.json) e detalhes em [docs/protocolo.md](docs/protocolo.md):
 
+A telemetria contém somente bateria e temperatura. Sensores dedicados de distância/proximidade e movimento foram retirados do escopo; o campo antigo `proximity_cm` não é mais aceito pelo schema. Atualize os clientes e reinicie o Node-RED com o fluxo atual para carregar a dashboard sem radar.
+
 | Tópico | QoS | Retained | Conteúdo |
 | --- | --- | --- | --- |
 | `rover/estado` | 1 | sim | Estado atual, estado anterior, motivo e movimento artificial |
-| `rover/telemetria` | 0 | não | Bateria (`%`), temperatura (`°C`), proximidade (`front`, `left`, `right` em `cm`) |
+| `rover/telemetria` | 0 | não | Bateria (`%`) e temperatura (`°C`) |
 | `rover/alarme` | 1 | não | Código, severidade (`warning`, `critical`) e mensagem |
 | `rover/log` | 0 | não | Nível (`INFO`, `WARNING`, `ERROR`), evento e mensagem |
 | `rover/status` | 1 | sim | Disponibilidade MQTT (`online`), motivo de encerramento e Last Will |

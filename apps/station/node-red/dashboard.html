@@ -190,7 +190,7 @@
     /* Telemetry Row */
     .telemetry-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr 1.45fr;
+      grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
 
@@ -198,17 +198,11 @@
       .telemetry-grid {
         grid-template-columns: 1fr 1fr;
       }
-      .telemetry-grid > :last-child {
-        grid-column: span 2;
-      }
     }
 
     @media (max-width: 768px) {
       .telemetry-grid {
         grid-template-columns: 1fr;
-      }
-      .telemetry-grid > :last-child {
-        grid-column: span 1;
       }
     }
 
@@ -291,61 +285,6 @@
       font-size: 0.74rem;
       color: var(--text-dim);
       font-family: var(--font-mono);
-    }
-
-    /* Proximity Radar & Bars */
-    .proximity-layout {
-      display: grid;
-      grid-template-columns: 185px 1fr;
-      gap: 16px;
-      align-items: center;
-    }
-
-    @media (max-width: 560px) {
-      .proximity-layout {
-        grid-template-columns: 1fr;
-        justify-items: center;
-      }
-    }
-
-    .radar-wrap {
-      background: #0b111e;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .prox-bars {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      width: 100%;
-    }
-
-    .prox-item {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 9px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .prox-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.82rem;
-    }
-
-    .prox-val {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 0.96rem;
     }
 
     /* Middle Row: Camera + Controls */
@@ -805,54 +744,6 @@
           </div>
         </div>
 
-        <!-- SENSORES DE PROXIMIDADE -->
-        <div class="panel">
-          <div class="metric-header">
-            <span class="metric-label">SENSORES DE PROXIMIDADE (FRENTE / ESQUERDA / DIREITA)</span>
-            <span class="badge badge-ok" id="proxGlobalBadge">CAMINHO LIVRE</span>
-          </div>
-
-          <div class="proximity-layout">
-            <div class="radar-wrap">
-              <canvas id="radarCanvas" width="170" height="150"></canvas>
-              <span style="font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); margin-top: 2px;">
-                RADAR 2D (0–200 cm)
-              </span>
-            </div>
-
-            <div class="prox-bars">
-              <div class="prox-item">
-                <div class="prox-row">
-                  <span>▲ Frente (`front`)</span>
-                  <span class="prox-val" id="proxFrontVal">--.- cm</span>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" id="proxFrontBar"></div>
-                </div>
-              </div>
-
-              <div class="prox-item">
-                <div class="prox-row">
-                  <span>◀ Esquerda (`left`)</span>
-                  <span class="prox-val" id="proxLeftVal">--.- cm</span>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" id="proxLeftBar"></div>
-                </div>
-              </div>
-
-              <div class="prox-item">
-                <div class="prox-row">
-                  <span>▶ Direita (`right`)</span>
-                  <span class="prox-val" id="proxRightVal">--.- cm</span>
-                </div>
-                <div class="progress-track">
-                  <div class="progress-fill" id="proxRightBar"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -1038,8 +929,7 @@
         motion: "PARAR",
         telemetry: {
           battery_percent: null,
-          temperature_c: null,
-          proximity_cm: { front: null, left: null, right: null }
+          temperature_c: null
         },
         history: {
           battery: [],
@@ -1075,15 +965,6 @@
       const tempAvg = document.getElementById("tempAvg");
       const tempMax = document.getElementById("tempMax");
       const tempSparkline = document.getElementById("tempSparkline");
-
-      const proxGlobalBadge = document.getElementById("proxGlobalBadge");
-      const proxFrontVal = document.getElementById("proxFrontVal");
-      const proxLeftVal = document.getElementById("proxLeftVal");
-      const proxRightVal = document.getElementById("proxRightVal");
-      const proxFrontBar = document.getElementById("proxFrontBar");
-      const proxLeftBar = document.getElementById("proxLeftBar");
-      const proxRightBar = document.getElementById("proxRightBar");
-      const radarCanvas = document.getElementById("radarCanvas");
 
       const currentStateText = document.getElementById("currentStateText");
       const prevStateText = document.getElementById("prevStateText");
@@ -1172,74 +1053,6 @@
         ctx.fill();
       }
 
-      function proxColor(cm) {
-        if (!Number.isFinite(cm)) return "#38bdf8";
-        if (cm < 50) return "#ef4444";
-        if (cm < 100) return "#f59e0b";
-        return "#10b981";
-      }
-
-      function drawRadar() {
-        const ctx = radarCanvas.getContext("2d");
-        const w = radarCanvas.width;
-        const h = radarCanvas.height;
-        const cx = w / 2;
-        const cy = h - 24;
-        const maxR = 110;
-
-        ctx.clearRect(0, 0, w, h);
-
-        // Concentric range arcs (50, 100, 150, 200 cm)
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.18)";
-        ctx.lineWidth = 1;
-        [0.25, 0.5, 0.75, 1.0].forEach((ratio) => {
-          ctx.beginPath();
-          ctx.arc(cx, cy, maxR * ratio, Math.PI, 0, false);
-          ctx.stroke();
-        });
-
-        // Crosshairs
-        ctx.beginPath();
-        ctx.moveTo(cx - maxR, cy);
-        ctx.lineTo(cx + maxR, cy);
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx, cy - maxR);
-        ctx.stroke();
-
-        const p = state.telemetry.proximity_cm || {};
-        const sectors = [
-          { val: p.front, start: -Math.PI * 0.65, end: -Math.PI * 0.35 },
-          { val: p.left, start: -Math.PI * 0.98, end: -Math.PI * 0.72 },
-          { val: p.right, start: -Math.PI * 0.28, end: -Math.PI * 0.02 }
-        ];
-
-        sectors.forEach((s) => {
-          if (!Number.isFinite(s.val)) return;
-          const clamped = Math.max(10, Math.min(200, s.val));
-          const r = (clamped / 200) * maxR;
-          const color = proxColor(s.val);
-
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.arc(cx, cy, r, s.start, s.end, false);
-          ctx.closePath();
-          ctx.fillStyle = color + "28";
-          ctx.fill();
-
-          ctx.beginPath();
-          ctx.arc(cx, cy, r, s.start, s.end, false);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 3.5;
-          ctx.stroke();
-        });
-
-        // Rover body
-        ctx.fillStyle = "#38bdf8";
-        ctx.fillRect(cx - 8, cy - 10, 16, 20);
-        ctx.strokeStyle = "#0284c7";
-        ctx.strokeRect(cx - 8, cy - 10, 16, 20);
-      }
-
       function updateTelemetryUI(envelope) {
         const d = envelope.data || {};
         state.source = envelope.source || state.source;
@@ -1251,7 +1064,6 @@
           bat = Math.max(0, Math.min(100, ((voltageDirect - 9.6) / 3.0) * 100));
         }
         const temp = Number(d.temperature_c);
-        const prox = d.proximity_cm || {};
 
         if (Number.isFinite(bat)) {
           state.telemetry.battery_percent = bat;
@@ -1316,41 +1128,6 @@
           drawSparkline(tempSparkline, tArr, "#38bdf8", "rgba(56, 189, 248, 0.16)", 36, 50);
         }
 
-        const f = Number(prox.front);
-        const l = Number(prox.left);
-        const r = Number(prox.right);
-        state.telemetry.proximity_cm = { front: f, left: l, right: r };
-
-        const updateProxBar = (valEl, barEl, val) => {
-          if (!Number.isFinite(val)) return;
-          valEl.textContent = val.toFixed(1) + " cm";
-          valEl.style.color = proxColor(val);
-          barEl.style.width = Math.max(2, Math.min(100, (val / 200) * 100)) + "%";
-          barEl.style.background = proxColor(val);
-        };
-
-        updateProxBar(proxFrontVal, proxFrontBar, f);
-        updateProxBar(proxLeftVal, proxLeftBar, l);
-        updateProxBar(proxRightVal, proxRightBar, r);
-
-        const minProx = Math.min(
-          Number.isFinite(f) ? f : 999,
-          Number.isFinite(l) ? l : 999,
-          Number.isFinite(r) ? r : 999
-        );
-
-        if (minProx < 50) {
-          proxGlobalBadge.className = "badge badge-danger";
-          proxGlobalBadge.textContent = "OBSTÁCULO PRÓXIMO (<50cm)";
-        } else if (minProx < 100) {
-          proxGlobalBadge.className = "badge badge-warn";
-          proxGlobalBadge.textContent = "ATENÇÃO (50–100cm)";
-        } else {
-          proxGlobalBadge.className = "badge badge-ok";
-          proxGlobalBadge.textContent = "CAMINHO LIVRE";
-        }
-
-        drawRadar();
       }
 
       function updateStateUI(envelope) {
@@ -1748,10 +1525,6 @@
           state.telemetry.temperature_c !== null
             ? state.telemetry.temperature_c.toFixed(1) + "°C"
             : "--°C";
-        const frTxt =
-          state.telemetry.proximity_cm.front !== null
-            ? state.telemetry.proximity_cm.front.toFixed(0) + "cm"
-            : "--cm";
         ctx.fillText(
           "MODO: " +
             state.currentState +
@@ -1760,9 +1533,7 @@
             "   |   BAT: " +
             batTxt +
             "   |   TEMP: " +
-            tmpTxt +
-            "   |   FRENTE: " +
-            frTxt,
+            tmpTxt,
           26,
           34
         );
@@ -1824,7 +1595,6 @@
         lastSeenBadge.textContent = "Último pacote: há " + sec + "s";
       }, 300);
 
-      drawRadar();
       connectWebSocket();
       requestAnimationFrame(renderCameraHud);
     })();

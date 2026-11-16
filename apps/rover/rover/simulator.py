@@ -14,6 +14,4 @@ class SimulatedSensors:
         return {
             "battery_percent": round(self.battery, 2),
             "temperature_c": round(self.random.uniform(38, 49), 1),
-            "proximity_cm": {name: round(self.random.uniform(25, 200), 1)
-                             for name in ("front", "left", "right")},
         }

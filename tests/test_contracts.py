@@ -46,11 +46,19 @@ def test_invalid_envelope(clock, field, value):
 
 
 @pytest.mark.parametrize("data", [
-    {"battery_percent": 101, "temperature_c": 40, "proximity_cm": {"front": 1, "left": 1, "right": 1}},
-    {"battery_percent": 50, "temperature_c": 40, "proximity_cm": {"front": -1, "left": 1, "right": 1}},
-    {"battery_percent": 50, "temperature_c": 40, "proximity_cm": {}},
+    {"battery_percent": 101, "temperature_c": 40},
+    {"battery_percent": -1, "temperature_c": 40},
+    {"battery_percent": 50, "temperature_c": 126},
 ])
 def test_sensor_ranges(data):
+    with pytest.raises(ContractError):
+        envelope("rover/telemetria", "test", data)
+
+
+def test_telemetry_rejects_removed_distance_sensor():
+    data = SimulatedSensors(1).sample()
+    assert set(data) == {"battery_percent", "temperature_c"}
+    data["proximity_cm"] = {"front": 100, "left": 100, "right": 100}
     with pytest.raises(ContractError):
         envelope("rover/telemetria", "test", data)
 
