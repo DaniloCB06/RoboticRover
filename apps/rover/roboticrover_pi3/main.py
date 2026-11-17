@@ -54,6 +54,11 @@ class RoverMqtt:
     def _publish(self, topic: str, event_type: str, data: dict, *, simulated: bool, retain: bool = False) -> None:
         if not self._connected.is_set():
             return
+        if event_type == "state":
+            data = dict(data, manual_enabled=self.controller.manual_authorized,
+                        control_target=self.controller.control_target)
+        elif event_type == "ack":
+            data = dict(data, control_target=self.controller.control_target)
         info = self._client.publish(topic, envelope(event_type, data, simulated), qos=1, retain=retain)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             LOG.warning("MQTT publish falhou: %s, rc=%s", topic, info.rc)
@@ -70,6 +75,7 @@ class RoverMqtt:
         with self._lock:
             self.controller.state = "SEGURO_ESPERA"
             self.controller.last_heartbeat = None
+            self.controller.manual_authorized = False
         LOG.info("Conectado ao broker %s:%s", self.config.host, self.config.port)
         self._publish("rover/status", "status", json.loads(self._status(True))["data"], simulated=False, retain=True)
         self._publish("rover/estado", "state", {"state": self.controller.state, "hardware_actuation": False}, simulated=True)
@@ -82,6 +88,7 @@ class RoverMqtt:
         with self._lock:
             self.controller.state = "SEGURO_ESPERA"
             self.controller.last_heartbeat = None
+            self.controller.manual_authorized = False
         LOG.warning("Desconectado do broker: %s", reason_code)
 
     def _on_message(self, client, userdata, msg):

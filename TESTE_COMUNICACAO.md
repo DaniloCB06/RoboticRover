@@ -257,12 +257,11 @@ docker compose up -d --force-recreate node-red-init node-red
 
 Na Dashboard você poderá:
 
-- Acompanhar **bateria (%)** e **temperatura (°C)** com gráficos em tempo real.
-- Alternar a câmera entre **Simulador HUD**, **WebRTC (WHEP)**, **WebRTC (Iframe)**
-  e **MJPEG HTTP**.
-- Comandar os modos (`BUSCA → APROXIMACAO → AGUARDANDO_PEGA → CAPTURA_MANUAL`) e
-  dirigir manualmente pelos botões ou pelo teclado (`W`, `A`, `S`, `D`, Setas e
-  `Espaço` para parada de emergência).
+- Comandar **ESPERA**, **BUSCA**, **APROXIMAÇÃO** e **MANUAL** pela barra abaixo da navbar. MANUAL depende da liberação do Rover ao concluir aproximação ou após uma parada forçada por Espaço.
+- Nos modos automáticos, todos os botões do direcional ficam desabilitados, inclusive **■**, e WASD/setas/Esc não enviam comandos. Espaço continua disponível para parada forçada e tomada de controle, fora de campos de edição. No manual, o alternador superior direito escolhe Rover ou braço, e o ícone **ⓘ** explica os atalhos e cliques. BUSCA revoga a autorização manual.
+- Alternar **Visão Rover** e **Visão Satélite**, configurando cada URL pela engrenagem. A fonte de vídeo precisa existir; a dashboard aceita WebRTC (WHEP), player WebRTC e MJPEG HTTP.
+- Abrir os gráficos em **Bateria e temperatura**, no topo.
+- Consultar estados, ACKs, avisos e erros no log único; clicar em qualquer registro abre seus detalhes.
 
 ### 7.2 Editor e Debug do Node-RED
 
@@ -358,7 +357,7 @@ macOS/Linux:
 
 Os testes de integração aparecem como ignorados nessa execução, pois precisam ser
 habilitados explicitamente. Na verificação desta versão, o resultado foi
-**105 aprovados e 7 ignorados**.
+**135 aprovados e 9 ignorados**.
 
 ### Integração real com o Compose
 
@@ -379,7 +378,7 @@ macOS/Linux:
 RUN_MQTT_INTEGRATION=1 .venv/bin/python -m pytest -q -p no:cacheprovider -m integration
 ```
 
-O resultado de referência desta versão é **7 aprovados**. Esses testes verificam
+O resultado de referência desta versão é **9 aprovados**. Esses testes verificam
 o fluxo Debug, Injects do Node-RED, ACKs, comandos inválidos, duplicatas, Last
 Will, falha artificial, heartbeat, parada segura e reconexão.
 

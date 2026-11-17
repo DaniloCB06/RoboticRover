@@ -171,3 +171,100 @@ def test_every_emission_obeys_contract(rig, clock):
     controller.command("rover/cmd/manual", b"{}")
     for topic, data in messages:
         validate(topic, envelope(topic, "test", data))
+
+
+def test_manual_override_requires_confirmed_stop(rig, clock):
+    controller, messages = rig
+    send(controller, command(clock, "BUSCA"))
+    override = command(clock, "CAPTURA_MANUAL")
+    override["data"]["operator_override"] = True
+    send(controller, override)
+    assert last_ack(messages)["reason"] == "MANUAL_OVERRIDE_REQUIRES_STOP"
+    takeover = command(clock, "PARAR", "rover/cmd/manual")
+    takeover["data"]["take_control"] = True
+    send(controller, takeover, "rover/cmd/manual")
+    override = command(clock, "CAPTURA_MANUAL")
+    override["data"]["operator_override"] = True
+    send(controller, override)
+    assert last_ack(messages)["accepted"] is True
+    assert controller.state == "CAPTURA_MANUAL"
+    assert controller.motion == "PARAR"
+
+
+def test_initial_wait_and_ordinary_stop_do_not_unlock_manual(rig, clock):
+    controller, messages = rig
+    send(controller, command(clock, "PARAR", "rover/cmd/manual"), "rover/cmd/manual")
+    assert controller.manual_authorized is False
+    override = command(clock, "CAPTURA_MANUAL")
+    override["data"]["operator_override"] = True
+    send(controller, override)
+    assert not last_ack(messages)["accepted"]
+
+
+def test_approach_completion_authorizes_arm_then_driving(rig, clock):
+    controller, messages = rig
+    assert not controller.approach_completed()
+    send(controller, command(clock, "BUSCA"))
+    assert not controller.manual_authorized
+    send(controller, command(clock, "APROXIMACAO"))
+    assert not controller.manual_authorized
+    assert controller.approach_completed()
+    assert controller.manual_authorized and controller.control_target == "manipulator"
+    assert controller.motion == "PARAR"
+    send(controller, command(clock, "CAPTURA_MANUAL"))
+    arm = command(clock, "SUBIR", "rover/cmd/manual")
+    arm["data"]["target"] = "manipulator"
+    send(controller, arm, "rover/cmd/manual")
+    assert last_ack(messages)["accepted"]
+    assert last_ack(messages)["control_target"] == "manipulator"
+    assert controller.arm_motion == "SUBIR" and controller.motion == "PARAR"
+    clock.advance(.51)
+    controller.tick()
+    assert controller.manual_authorized and controller.arm_motion == "PARAR"
+    override = command(clock, "CAPTURA_MANUAL")
+    override["data"]["operator_override"] = True
+    send(controller, override)
+    drive = command(clock, "AVANCAR", "rover/cmd/manual")
+    drive["data"]["target"] = "rover"
+    send(controller, drive, "rover/cmd/manual")
+    assert controller.motion == "AVANCAR" and controller.arm_motion == "PARAR"
+    send(controller, command(clock, "BUSCA"))
+    assert not controller.manual_authorized
+
+
+def test_manual_authorization_revoked_by_heartbeat_loss(rig, clock):
+    controller, _ = rig
+    takeover = command(clock, "PARAR", "rover/cmd/manual")
+    takeover["data"]["take_control"] = True
+    send(controller, takeover, "rover/cmd/manual")
+    assert controller.manual_authorized
+    clock.advance(4.1)
+    controller.tick()
+    assert not controller.manual_authorized
+
+
+@pytest.mark.parametrize("target,action", [("rover", "SUBIR"), ("manipulator", "AVANCAR")])
+def test_action_cannot_be_routed_to_wrong_actuator(rig, clock, target, action):
+    controller, messages = rig
+    controller.state = "CAPTURA_MANUAL"
+    packet = command(clock, action, "rover/cmd/manual")
+    packet["data"]["target"] = target
+    send(controller, packet, "rover/cmd/manual")
+    assert last_ack(messages)["reason"] == "ACTION_TARGET_MISMATCH"
+    assert controller.motion == controller.arm_motion == "PARAR"
+
+
+def test_manual_override_does_not_bypass_fault_or_heartbeat(rig, clock):
+    controller, messages = rig
+    override = command(clock, "CAPTURA_MANUAL")
+    override["data"]["operator_override"] = True
+    controller.fault()
+    send(controller, override)
+    assert last_ack(messages)["reason"] == "FAULT_LATCHED"
+    controller.faulted = False
+    controller.last_heartbeat = None
+    send(controller, command(clock, SAFE))
+    override = command(clock, "CAPTURA_MANUAL")
+    override["data"]["operator_override"] = True
+    send(controller, override)
+    assert last_ack(messages)["reason"] == "STATION_UNAVAILABLE"

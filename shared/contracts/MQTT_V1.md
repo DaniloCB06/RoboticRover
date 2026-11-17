@@ -34,6 +34,8 @@ Envelope de todas as mensagens:
 - Mensagens maiores que 4096 bytes, com timestamps antigos/futuros, comandos duplicados ou retained são ignorados/rejeitados.
 - `station/heartbeat`: `data.online=true` e `data.session_id` obrigatório. Espera em até 4 segundos de ausência de heartbeat.
 - O `PARAR` atualmente publicado em `rover/cmd/manual` ou `SEGURO_ESPERA` em `rover/cmd/modo` leva à espera segura simulada de qualquer estado.
+- `state.data.manual_enabled` informa a autorização manual. Ela é concedida ao concluir aproximação (`AGUARDANDO_PEGA`) ou por `PARAR` com `take_control:true`, desde que o heartbeat seja válido. BUSCA, falhas e reconexão revogam a autorização; parada comum não cria autorização inicial.
+- Comandos manuais aceitam `target:"rover"` (padrão) ou `target:"manipulator"`. O braço usa `SUBIR`/`DESCER`/`ESQUERDA`/`DIREITA`/`PARAR`; as rodas usam `AVANCAR`/`RECUAR`/`ESQUERDA`/`DIREITA`/`PARAR`. Estado e ACK identificam `control_target`. Tudo permanece sem atuação física.
 - ACK documentado:
 
 ```json

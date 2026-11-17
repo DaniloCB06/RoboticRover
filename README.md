@@ -2,7 +2,7 @@
 
 Infraestrutura de comunicação MQTT, Simulador da Raspberry Pi 3 e **Dashboard do Operador** entre o Rover e a estação-base. **Todos os dados, sensores, falhas e movimentos desta versão são simulados (`simulated: true`). Nenhum código aciona hardware físico.**
 
-A estação-base utiliza **Mosquitto** (broker MQTT v5) e **Node-RED** (fluxos MQTT + servidor da Dashboard em <http://127.0.0.1:1880/dashboard>), com suporte híbrido de câmera (**Simulador HUD**, **WebRTC/WHEP** via MediaMTX/go2rtc e **MJPEG sobre HTTP**).
+A estação-base utiliza **Mosquitto** (broker MQTT v5) e **Node-RED** (fluxos MQTT + servidor da Dashboard em <http://127.0.0.1:1880/dashboard>), com duas visões de câmera configuráveis por **WebRTC/WHEP**, player WebRTC ou **MJPEG sobre HTTP**.
 
 Você pode executar o projeto de **duas formas** em **Windows, macOS ou Linux**:
 - **Opção 1 — Com Docker:** Mosquitto e Node-RED rodam em containers Docker; o simulador Python roda localmente.
@@ -292,34 +292,19 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
 
 ### 5.1. Roteiro passo a passo na Dashboard (<http://127.0.0.1:1880/dashboard>)
 
-1. **Verificar Conectividade no Topo da Página:**
-   - O indicador **WS** deve ficar verde (`WS: Conectado`).
-   - O indicador **ROVER** deve ficar verde (`ROVER: ONLINE (rover-sim-01)`).
-   - O contador **Último pacote** deve atualizar continuamente a cada ~1 s (`há 0.1s` – `1.0s`).
+1. Verifique **WS: conectado** e **Rover: online**. O link **Fluxo Node-RED** abre o editor; a origem dos dados e a idade do último pacote ficam no rodapé.
+2. Os modos **ESPERA**, **BUSCA**, **APROXIMAÇÃO** e **MANUAL** ficam alinhados abaixo da navbar. O destaque indica o estado recebido do Rover, não apenas o botão clicado. Busca/aproximação continuam sendo estados simulados, sem navegação física implementada.
+3. Selecione **Visão Rover** ou **Visão Satélite** e use a engrenagem para configurar um stream MJPEG, WHEP ou player WebRTC. Cada visão conserva sua própria URL no navegador. Sem stream configurado, o painel mostra a câmera indisponível; não produz vídeo artificial. A câmera satélite depende de uma fonte externa fornecida pelo operador.
+4. Em BUSCA e APROXIMAÇÃO, todos os botões do direcional, inclusive **■**, ficam apagados e desabilitados; WASD, setas e Esc não enviam comandos manuais. MANUAL também permanece indisponível até a autorização do Rover. A conclusão da aproximação (`AGUARDANDO_PEGA`, `manual_enabled: true`) libera o controle com o braço selecionado. O método `approach_completed()` é o ponto de entrada para a futura navegação confirmar chegada e parada; o simulador não inventa chegada por temporizador. Os Injects do fluxo permitem representar essa conclusão nos testes.
+5. **Espaço**, fora de campos de edição, solicita parada forçada com `take_control: true`; após confirmação e autorização do Rover, a dashboard entra em modo manual. O alternador no canto superior direito escolhe **Pilotar Rover / Controlar braço** e envia parada antes da troca. WASD, setas e cliques controlam o destino selecionado; **■** ou Esc interrompe o manual. O ícone **ⓘ** abre o mapa dos controles. Cada movimento dura 500 ms; o prazo local permanece ativo. O botão **BUSCA** devolve a operação ao automático e revoga a autorização manual. Falhas, perda do heartbeat e reconexões também revogam essa autorização no controlador.
+6. O **Registro de operações** reúne estados, conexões, ACKs, avisos e erros, com cores e filtros. Clique em um registro para abrir o envelope completo. O Node-RED conserva até 200 eventos em memória; reiniciar o serviço limpa esse histórico.
+7. **Bateria e temperatura** abre os gráficos em popup. Eles recebem telemetria continuamente, mas só são desenhados quando o popup está aberto. Feche com Esc, pelo botão ou clicando fora.
 
-2. **Visualizar a Telemetria em Tempo Real (`rover/telemetria`):**
-   - **Carga da Bateria:** observe o percentual (`%`), a estimativa de tensão LiPo 3S e o gráfico histórico (*sparkline*) sendo desenhado a cada segundo.
-   - **Temperatura Interna:** acompanhe a variação simulada (`38–49 °C`), os indicadores de `Mín`, `Méd`, `Máx` e a curva histórica.
+Após editar `dashboard.html`, sincronize o template e reinicie o Node-RED:
 
-3. **Testar o Painel Híbrido de Câmera:**
-   - **Simulador HUD (padrão sem hardware):** exibe o horizonte artificial em perspectiva 3D, mira tática, dados de telemetria no topo e um alvo simulado que reage ao modo operacional do Rover.
-   - **WebRTC (WHEP):** pronto para conectar a um servidor **MediaMTX** ou **go2rtc** na Raspberry Pi (ex.: `http://192.168.1.50:8889/rover/whep`).
-   - **WebRTC (Player/Iframe):** permite embutir a página WebRTC nativa do MediaMTX/go2rtc (`http://192.168.1.50:8889/rover`).
-   - **MJPEG HTTP:** conecta a streams **uStreamer** / **mjpg-streamer** (`http://192.168.1.50:8080/?action=stream`).
-
-4. **Comandar a Máquina de Estados (`rover/cmd/modo`):**
-   - Clique nos botões de modo na ordem válida destacada em azul:
-     **`BUSCA` → `APROXIMACAO` → `AGUARDANDO_PEGA` → `CAPTURA_MANUAL`**.
-   - A cada clique, veja o painel **ÚLTIMO ACK** confirmar `ACEITO (ACCEPTED)` e o **Estado Operacional Atual** atualizar imediatamente.
-
-5. **Testar Controle Manual de Direção (`rover/cmd/manual`):**
-   - Estando em `CAPTURA_MANUAL`, clique em **▲ AVANÇAR** (ou pressione `W` / `Seta para Cima` no teclado).
-   - O badge mudará para `MOVIMENTO: AVANCAR` e a grade 3D da câmera simulada avançará.
-   - Após o tempo do pulso (padrão `500 ms`, ajustável no controle deslizante de `100 ms` a `1000 ms`), o watchdog local do simulador encerra o movimento e retorna automaticamente para `SEGURO_ESPERA` (`manual_deadline_expired`).
-
-6. **Testar Parada de Emergência e Rejeição de Comando Inválido:**
-   - Em qualquer modo, pressione a **Barra de Espaço** (ou clique no botão vermelho **PARADA DE EMERGÊNCIA** no topo): o Rover vai imediatamente para `SEGURO_ESPERA`.
-   - Estando em `SEGURO_ESPERA`, clique diretamente em **`CAPTURA_MANUAL`** (pulando etapas): observe que o Rover permanece em `SEGURO_ESPERA` e o painel **ÚLTIMO ACK** exibe em vermelho `REJEITADO (TRANSITION_FORBIDDEN)`.
+```bash
+node apps/station/node-red/sync-dashboard.js
+```
 
 ---
 
@@ -343,14 +328,14 @@ Assim que **Mosquitto**, **Node-RED** e o **Simulador Python** estiverem rodando
   ```bash
   .venv/bin/python -m pytest -q
   ```
-*(Resultado esperado: **126 aprovados** e **8 ignorados**, referentes aos testes de integração real).*
+*(Resultado esperado: **135 aprovados** e **9 ignorados**, referentes aos testes de integração real).*
 
 Também é possível rodar isoladamente a suíte `unittest` do pacote da Raspberry Pi 3:
 ```bash
 cd apps/rover
 ../../.venv/bin/python -m unittest discover -s tests -v
 ```
-*(Resultado esperado: **19 testes aprovados**).*
+*(Resultado esperado: **21 testes aprovados**).*
 
 ### 6.2. Testes de Integração Real (com Mosquitto e Node-RED ativos — Com ou Sem Docker)
 
@@ -367,7 +352,7 @@ cd apps/rover
      ```bash
      RUN_MQTT_INTEGRATION=1 .venv/bin/python -m pytest -q -p no:cacheprovider -m integration
      ```
-*(Resultado esperado: **8 aprovados**, validando MQTT real, Debug do Node-RED, Injects, ACKs, rejeições, Last Will, watchdog de heartbeat e a Dashboard HTTP/WebSocket).*
+*(Resultado esperado: **9 aprovados**, validando MQTT real, Debug do Node-RED, Injects, ACKs, rejeições, Last Will, watchdog de heartbeat, Dashboard HTTP/WebSocket e tomada de controle manual com correlação de comandos).*
 
 ---
 
@@ -495,4 +480,4 @@ Para substituir o simulador pelo Rover físico na Raspberry Pi 3:
 1. Implemente uma classe de leitura real (ex.: serial com Arduino Mega) substituindo `SimulatedSensors` em `apps/rover/rover/`.
 2. Atualize o schema para permitir `simulated: false` somente quando os dados vierem do hardware real.
 3. Configure autenticação, ACL e TLS no Mosquitto conforme [docs/seguranca.md](docs/seguranca.md) antes de abrir o broker na rede Wi-Fi local.
-4. Na Dashboard (<http://127.0.0.1:1880/dashboard>), selecione a aba **WebRTC (WHEP)** ou **MJPEG HTTP** no painel de câmera e informe o IP da Raspberry Pi.
+4. Na Dashboard (<http://127.0.0.1:1880/dashboard>), selecione **Visão Rover**, abra a engrenagem e configure **WebRTC (WHEP)** ou **MJPEG HTTP** com a URL do stream da Raspberry Pi.

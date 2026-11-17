@@ -21,6 +21,38 @@ estado e log. Ações manuais de movimento só são aceitas em CAPTURA_MANUAL e
 param em até 1 s pelo relógio monotônico local; ao expirar, entram em espera.
 Qualquer mudança de modo também zera movimento e seu prazo.
 
+A autorização manual pertence ao controlador e é publicada em
+`rover/estado.data.manual_enabled`. A conclusão confirmada da aproximação,
+representada por `AGUARDANDO_PEGA`, libera o operador e seleciona o manipulador.
+O método `approach_completed()` permite à futura navegação informar essa
+conclusão; não existe temporizador que simule chegada física. Início, BUSCA,
+APROXIMAÇÃO, falhas, perda de heartbeat e reconexões não autorizam controle.
+
+Espaço envia `PARAR` com `take_control: true`; o Rover sempre pode parar, mas
+só autoriza controle se o heartbeat for válido e não houver falha latched.
+Após confirmação, a dashboard solicita `CAPTURA_MANUAL` com
+`operator_override: true`. A transição exige `SEGURO_ESPERA` e autorização
+prévia: uma parada comum, o modo ESPERA ou clicar em MANUAL não cria permissão.
+BUSCA revoga a autorização. Paradas e fim de pulsos durante uma sessão manual
+válida preservam a autorização até retorno ao automático ou falha.
+
+`rover/cmd/manual.data.target` identifica `rover` (padrão para clientes antigos)
+ou `manipulator`. O Rover aceita `AVANCAR`, `RECUAR`, `ESQUERDA`, `DIREITA`;
+o manipulador aceita `SUBIR`, `DESCER`, `ESQUERDA`, `DIREITA`. Ambos aceitam
+`PARAR`. Ações incompatíveis com o destino são rejeitadas. A troca de destino
+envia uma parada com o novo `target` antes de liberar o próximo comando.
+O estado e o ACK incluem `control_target`; o simulador mantém `motion: PARAR`
+ao controlar o braço e publica a ação separadamente em `arm_motion`. Os
+clientes continuam em simulação, sem cinemática, captura/soltura ou atuação real.
+
+A estação preserva o UUID opcional recebido da dashboard nos comandos HTTP/WS,
+permitindo correlacionar cada etapa ao seu ACK. Mensagens sem UUID continuam
+recebendo um UUID gerado pela estação. A interface depende do estado confirmado
+e de `manual_enabled: true`; o ACK sozinho não libera botões. Durante o
+automático, todos os botões do direcional e os atalhos manuais ficam bloqueados.
+Espaço permanece disponível para tomada de controle. O primeiro movimento após
+espera autorizada solicita o modo manual antes de enviar direção.
+
 ## Decisão e ACK
 
 1. Limite de 16 KiB, UTF-8, JSON estrito (sem NaN, Infinity ou chaves repetidas).

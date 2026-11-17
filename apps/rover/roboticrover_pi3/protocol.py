@@ -13,7 +13,7 @@ MODES = frozenset({
     "SEGURO_ESPERA", "BUSCA", "APROXIMACAO", "AGUARDANDO_PEGA",
     "CAPTURA_MANUAL", "RETORNO", "DEPOSITO",
 })
-MANUAL_ACTIONS = frozenset({"AVANCAR", "RECUAR", "ESQUERDA", "DIREITA", "PARAR"})
+MANUAL_ACTIONS = frozenset({"AVANCAR", "RECUAR", "ESQUERDA", "DIREITA", "PARAR", "SUBIR", "DESCER"})
 TOPICS = {
     "rover/cmd/modo": "mode_command",
     "rover/cmd/manual": "manual_command",
@@ -102,7 +102,13 @@ def read_packet(topic: str, payload: bytes, *, received_at: Optional[datetime] =
         if topic == "rover/cmd/modo":
             if data.get("mode") not in MODES:
                 raise ValueError("modo desconhecido")
+            if "operator_override" in data and not isinstance(data["operator_override"], bool):
+                raise ValueError("operator_override deve ser booleano")
         else:
+            if data.get("target", "rover") not in ("rover", "manipulator"):
+                raise ValueError("target inválido")
+            if "take_control" in data and not isinstance(data["take_control"], bool):
+                raise ValueError("take_control deve ser booleano")
             if data.get("action") not in MANUAL_ACTIONS:
                 raise ValueError("ação desconhecida")
             if isinstance(data.get("duration_ms"), bool) or not isinstance(data.get("duration_ms"), int) or not (0 < data["duration_ms"] <= 1000):

@@ -68,6 +68,32 @@ class StateTests(unittest.TestCase):
         self.assertTrue(result.accepted)
         self.assertEqual(result.execution, "simulated_only")
 
+    def test_operator_override_requires_stop_and_heartbeat(self):
+        self.c.heartbeat(heartbeat(), at=10)
+        self.c.command(mode("BUSCA"), at=11)
+        packet = mode("CAPTURA_MANUAL")
+        packet.data["operator_override"] = True
+        self.assertFalse(self.c.command(packet, at=11).accepted)
+        takeover = manual("PARAR")
+        takeover.data["take_control"] = True
+        self.c.command(takeover, at=11)
+        packet = mode("CAPTURA_MANUAL")
+        packet.data["operator_override"] = True
+        self.assertTrue(self.c.command(packet, at=11).accepted)
+
+    def test_arm_command_does_not_become_driving(self):
+        self.c.heartbeat(heartbeat(), at=10)
+        for state in ("BUSCA", "APROXIMACAO", "AGUARDANDO_PEGA", "CAPTURA_MANUAL"):
+            self.assertTrue(self.c.command(mode(state), at=11).accepted)
+        packet = manual("SUBIR")
+        packet.data["target"] = "manipulator"
+        decision = self.c.command(packet, at=11)
+        self.assertTrue(decision.accepted)
+        self.assertEqual(decision.control_target, "manipulator")
+        self.assertTrue(self.c.manual_authorized)
+        self.c.command(mode("BUSCA"), at=11)
+        self.assertFalse(self.c.manual_authorized)
+
 
 if __name__ == "__main__":
     unittest.main()

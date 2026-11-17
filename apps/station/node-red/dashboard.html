@@ -1,1603 +1,301 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RoboticRover • Dashboard da Estação-Base</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RoboticRover</title>
   <style>
-    :root {
-      --bg-base: #090d16;
-      --bg-panel: #111827;
-      --bg-card: #172033;
-      --bg-card-hover: #1e293b;
-      --border: #26334d;
-      --border-highlight: #3b82f6;
-      --text-main: #f1f5f9;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
-      --accent: #38bdf8;
-      --accent-strong: #0284c7;
-      --ok: #10b981;
-      --ok-bg: rgba(16, 185, 129, 0.14);
-      --warn: #f59e0b;
-      --warn-bg: rgba(245, 158, 11, 0.14);
-      --danger: #ef4444;
-      --danger-bg: rgba(239, 68, 68, 0.16);
-      --radius: 10px;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background: radial-gradient(circle at top, #131c31 0%, var(--bg-base) 70%);
-      color: var(--text-main);
-      font-family: var(--font-sans);
-      min-height: 100vh;
-      line-height: 1.45;
-    }
-
-    /* Top Bar */
-    .topbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 20px;
-      background: rgba(17, 24, 39, 0.92);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      backdrop-filter: blur(10px);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .brand-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #0ea5e9, #2563eb);
-      display: grid;
-      place-items: center;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      letter-spacing: -0.5px;
-      box-shadow: 0 0 16px rgba(14, 165, 233, 0.35);
-    }
-
-    .brand-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .brand-sub {
-      font-size: 0.76rem;
-      color: var(--text-muted);
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      font-family: var(--font-mono);
-      border: 1px solid transparent;
-    }
-
-    .badge-sim {
-      background: rgba(56, 189, 248, 0.14);
-      color: var(--accent);
-      border-color: rgba(56, 189, 248, 0.35);
-    }
-
-    .badge-ok {
-      background: var(--ok-bg);
-      color: #34d399;
-      border-color: rgba(16, 185, 129, 0.35);
-    }
-
-    .badge-warn {
-      background: var(--warn-bg);
-      color: #fbbf24;
-      border-color: rgba(245, 158, 11, 0.35);
-    }
-
-    .badge-danger {
-      background: var(--danger-bg);
-      color: #f87171;
-      border-color: rgba(239, 68, 68, 0.4);
-    }
-
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: currentColor;
-      display: inline-block;
-    }
-
-    .status-strip {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .btn-emergency {
-      background: linear-gradient(135deg, #dc2626, #991b1b);
-      color: #fff;
-      border: 1px solid #f87171;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.82rem;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      box-shadow: 0 0 18px rgba(239, 68, 68, 0.4);
-      transition: transform 0.1s ease, box-shadow 0.15s ease;
-    }
-
-    .btn-emergency:hover {
-      box-shadow: 0 0 24px rgba(239, 68, 68, 0.7);
-      transform: translateY(-1px);
-    }
-
-    .btn-emergency:active {
-      transform: translateY(0);
-    }
-
-    /* Main Grid */
-    .container {
-      max-width: 1600px;
-      margin: 0 auto;
-      padding: 16px 20px 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .section-title {
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-
-    /* Telemetry Row */
-    .telemetry-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    @media (max-width: 1200px) {
-      .telemetry-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .telemetry-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .panel {
-      background: var(--bg-panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-    }
-
-    .metric-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .metric-label {
-      font-size: 0.84rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .metric-main {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-    }
-
-    .metric-value {
-      font-size: 2.15rem;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      letter-spacing: -1px;
-    }
-
-    .metric-unit {
-      font-size: 1rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .progress-track {
-      width: 100%;
-      height: 10px;
-      background: #0b111e;
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #10b981, #34d399);
-      border-radius: 999px;
-      transition: width 0.25s ease, background 0.25s ease;
-    }
-
-    .sparkline-box {
-      background: #0b111e;
-      border: 1px solid rgba(38, 51, 77, 0.7);
-      border-radius: 8px;
-      padding: 6px 8px;
-    }
-
-    .sparkline-canvas {
-      width: 100%;
-      height: 64px;
-      display: block;
-    }
-
-    .metric-stats {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.74rem;
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-    }
-
-    /* Middle Row: Camera + Controls */
-    .workspace-grid {
-      display: grid;
-      grid-template-columns: 1.35fr 1fr;
-      gap: 16px;
-    }
-
-    @media (max-width: 1100px) {
-      .workspace-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Camera Viewport */
-    .cam-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .tab-group {
-      display: inline-flex;
-      background: #0b111e;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 3px;
-      gap: 4px;
-    }
-
-    .tab-btn {
-      background: transparent;
-      color: var(--text-muted);
-      border: none;
-      padding: 6px 11px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .tab-btn.active {
-      background: var(--bg-card-hover);
-      color: var(--accent);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .cam-config-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      padding: 8px 10px;
-      border-radius: 8px;
-    }
-
-    .cam-input {
-      flex: 1;
-      min-width: 210px;
-      background: #0b111e;
-      color: var(--text-main);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-    }
-
-    .btn {
-      background: var(--bg-card-hover);
-      color: var(--text-main);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .btn:hover:not(:disabled) {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .btn-primary {
-      background: var(--accent-strong);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: #0369a1;
-      color: #fff;
-    }
-
-    .cam-stage {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      background: #05080f;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      display: grid;
-      place-items: center;
-    }
-
-    .cam-stage video,
-    .cam-stage img,
-    .cam-stage iframe,
-    .cam-stage canvas {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    #camHudCanvas {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    .cam-info-note {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px;
-    }
-
-    .cam-info-note code {
-      color: var(--accent);
-      font-family: var(--font-mono);
-    }
-
-    /* State Machine & Manual Controls */
-    .state-banner {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .state-current {
-      font-family: var(--font-mono);
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: var(--accent);
-    }
-
-    .state-meta {
-      font-size: 0.76rem;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-    }
-
-    .mode-pipeline {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 8px;
-    }
-
-    @media (max-width: 680px) {
-      .mode-pipeline {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    .mode-btn {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 8px;
-      color: var(--text-main);
-      font-family: var(--font-mono);
-      font-size: 0.73rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.15s ease;
-      text-align: center;
-    }
-
-    .mode-btn .step-tag {
-      font-size: 0.65rem;
-      color: var(--text-dim);
-      font-weight: 500;
-    }
-
-    .mode-btn.active-state {
-      border-color: var(--ok);
-      background: rgba(16, 185, 129, 0.14);
-      color: #34d399;
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
-    }
-
-    .mode-btn.next-valid {
-      border-color: var(--accent);
-      background: rgba(56, 189, 248, 0.1);
-    }
-
-    .mode-btn:hover {
-      transform: translateY(-1px);
-      border-color: var(--accent);
-    }
-
-    /* Manual D-Pad */
-    .manual-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      align-items: center;
-    }
-
-    @media (max-width: 560px) {
-      .manual-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .dpad {
-      display: grid;
-      grid-template-columns: repeat(3, 64px);
-      grid-template-rows: repeat(3, 52px);
-      gap: 8px;
-      justify-content: center;
-    }
-
-    .dpad-btn {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-main);
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      user-select: none;
-      transition: all 0.1s ease;
-    }
-
-    .dpad-btn kbd {
-      font-size: 0.62rem;
-      color: var(--text-dim);
-    }
-
-    .dpad-btn:hover {
-      border-color: var(--accent);
-      background: var(--bg-card-hover);
-    }
-
-    .dpad-btn:active,
-    .dpad-btn.pressed {
-      background: var(--accent-strong);
-      border-color: var(--accent);
-      transform: scale(0.96);
-    }
-
-    .dpad-stop {
-      background: rgba(239, 68, 68, 0.18);
-      border-color: rgba(239, 68, 68, 0.5);
-      color: #fca5a5;
-    }
-
-    .manual-options {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 0.78rem;
-    }
-
-    .ack-box {
-      background: #0b111e;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-family: var(--font-mono);
-      font-size: 0.76rem;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    /* Bottom Feed */
-    .feed-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    @media (max-width: 960px) {
-      .feed-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .event-list {
-      background: #0b111e;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      height: 190px;
-      overflow-y: auto;
-      padding: 8px;
-      font-family: var(--font-mono);
-      font-size: 0.74rem;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .event-item {
-      padding: 6px 8px;
-      border-radius: 6px;
-      background: rgba(23, 32, 51, 0.7);
-      border-left: 3px solid var(--accent);
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .event-item.warn {
-      border-left-color: var(--warn);
-    }
-
-    .event-item.error {
-      border-left-color: var(--danger);
-      background: rgba(239, 68, 68, 0.1);
-    }
-
-    .event-time {
-      color: var(--text-dim);
-      white-space: nowrap;
-    }
+    :root { color-scheme:dark; --bg:#090d14; --panel:#111823; --line:#253041; --muted:#8493a7; --text:#e7edf5; --blue:#59a9ff; --green:#58d3a2; --amber:#eeb762; --red:#ff737e; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input,select { font:inherit; }
+    button,a { -webkit-tap-highlight-color:transparent; }
+    button { cursor:pointer; color:inherit; }
+    button:disabled { cursor:not-allowed; opacity:.32; }
+    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--blue); outline-offset:4px; }
+    [hidden] { display:none !important; }
+    .topbar { min-height:76px; padding:16px 32px; display:flex; align-items:center; justify-content:space-between; gap:20px; border-bottom:1px solid var(--line); }
+    .brand { font-size:22px; font-weight:750; letter-spacing:-.8px; display:flex; gap:12px; align-items:center; }
+    .brand-mark { color:var(--blue); font:700 13px monospace; border:1px solid #355078; padding:8px; border-radius:10px; letter-spacing:0; }
+    .top-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .quiet-button { border:1px solid var(--line); background:transparent; padding:9px 12px; border-radius:8px; text-decoration:none; color:var(--muted); font-size:12px; }
+    .quiet-button:hover { color:var(--text); background:#1a2533; }
+    .status { display:inline-flex; align-items:center; gap:7px; font:11px monospace; color:var(--muted); }
+    .status::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+    .status.online { color:var(--green); } .status.offline { color:var(--red); }
+    main { max-width:1600px; margin:auto; padding:24px 32px 32px; }
+    .mode-bar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:24px; }
+    .mode-button { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; display:flex; align-items:center; gap:12px; text-align:left; transition:background .15s,border-color .15s; }
+    .mode-button .number { color:var(--muted); font:12px monospace; }
+    .mode-button strong { font-size:12px; letter-spacing:1px; } .mode-button small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
+    .mode-button[aria-pressed="true"] { background:#14283f; border-color:var(--blue); } .mode-button[aria-pressed="true"] .number { color:var(--blue); }
+    .workspace { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr); gap:20px; }
+    .camera { position:relative; background:#05080d; border:1px solid var(--line); border-radius:14px; overflow:hidden; min-height:420px; }
+    .camera-stage { position:absolute; inset:0; display:grid; place-items:center; }
+    .camera-stage video,.camera-stage img,.camera-stage iframe { width:100%; height:100%; object-fit:contain; border:0; }
+    .camera-empty { text-align:center; color:var(--muted); padding:85px 30px; }
+    .camera-empty .crosshair { display:block; font-size:42px; font-weight:200; color:#36506e; margin-bottom:20px; }
+    .camera-empty strong { display:block; color:#b5c3d4; font-weight:500; margin-bottom:9px; }
+    .camera-empty p { font-size:12px; margin:0; }
+    .camera-top { position:absolute; top:16px; left:16px; right:16px; display:flex; justify-content:space-between; gap:8px; align-items:start; z-index:2; }
+    .view-switch { display:flex; padding:4px; gap:3px; background:#0c131ee8; border:1px solid var(--line); border-radius:9px; }
+    .view-switch button { padding:9px 12px; border:0; border-radius:6px; background:none; color:var(--muted); font-size:12px; }
+    .view-switch button[aria-pressed="true"] { background:#24354b; color:var(--text); }
+    .camera-settings { background:#0c131ee8; }
+    .control-panel { display:flex; flex-direction:column; gap:16px; min-width:0; }
+    .control-pad { background:var(--panel); border:1px solid var(--line); border-radius:14px; flex:1; min-height:288px; display:grid; place-items:center; position:relative; padding:24px; }
+    .control-tools { position:absolute; top:12px; left:14px; right:14px; display:flex; justify-content:space-between; gap:10px; }
+    .control-tools button { background:#142031; border:1px solid #334158; border-radius:8px; padding:7px 10px; font-size:12px; }
+    .control-tools .info-button { border-radius:50%; width:30px; height:30px; padding:0; }
+    .control-pad .pad { margin-top:28px; }
+    .help-copy { color:#bdcbdb; font-size:14px; line-height:1.8; }
+    .help-copy p { margin:0 0 16px; }
+    .help-copy kbd { background:#23324a; padding:2px 6px; border-radius:4px; font-family:monospace; }
+    .pad { display:grid; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(3,64px); gap:9px; }
+    .direction { border:1px solid #334158; border-radius:12px; background:#1c2838; font-size:25px; transition:background .12s; }
+    .direction:hover:not(:disabled) { background:#2d4563; }
+    .direction.stop { background:#3c1f29; border-color:#74343f; color:var(--red); font-size:20px; }
+    .control-pad[data-locked="true"] .direction { opacity:.22; filter:grayscale(1); }
+    .summary { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .summary-card { padding:17px; min-height:112px; border-radius:12px; border:1px solid var(--line); background:var(--panel); min-width:0; }
+    .eyebrow { font-size:10px; letter-spacing:1.4px; font-weight:650; color:var(--muted); text-transform:uppercase; }
+    .summary-card strong { display:block; font-size:16px; margin:12px 0 6px; color:var(--blue); overflow-wrap:anywhere; }
+    .summary-card small { color:var(--muted); font-size:11px; line-height:1.5; display:block; overflow-wrap:anywhere; }
+    .log-panel { margin-top:22px; border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow:hidden; }
+    .log-toolbar { padding:18px 20px; display:flex; justify-content:space-between; gap:12px; align-items:center; border-bottom:1px solid var(--line); }
+    .log-toolbar strong { font-size:13px; font-weight:600; } .log-toolbar span { color:var(--muted); font:11px monospace; margin-left:12px; }
+    .log-actions { display:flex; gap:8px; }
+    .log-actions select { background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:7px; padding:7px; font-size:12px; }
+    .event-list { height:260px; overflow:auto; padding:6px 12px; }
+    .log-empty { padding:40px 20px; text-align:center; color:var(--muted); font-size:12px; }
+    .event { width:100%; display:grid; grid-template-columns:78px 118px 1fr 20px; gap:14px; align-items:center; padding:13px 9px; background:transparent; border:0; border-bottom:1px solid #202b3b; text-align:left; font-size:12px; }
+    .event:hover { background:#1a2533; } .event time { color:var(--muted); font:11px monospace; }
+    .event-tag { border-radius:5px; padding:5px 7px; font:10px monospace; text-align:center; border:1px solid currentColor; color:var(--blue); background:#152438; }
+    .event-tag[data-kind="warn"] { color:var(--amber); background:#302818; } .event-tag[data-kind="error"] { color:var(--red); background:#341d29; }
+    .event-tag[data-state="BUSCA"] { color:#c4a0ff; background:#291e3f; } .event-tag[data-state="APROXIMACAO"] { color:var(--blue); }
+    .event-tag[data-state="CAPTURA_MANUAL"] { color:var(--green); background:#16352c; } .event-tag[data-state="AGUARDANDO_PEGA"] { color:var(--amber); }
+    .event-tag[data-state="SEGURO_ESPERA"] { color:#adbbc9; background:#25303b; }
+    .event-message { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .event-arrow { color:var(--muted); }
+    .footer { color:#65758a; font:10px monospace; margin-top:14px; display:flex; justify-content:space-between; gap:12px; }
+    .modal-backdrop { position:fixed; inset:0; z-index:100; background:#02060dc9; display:grid; place-items:center; padding:24px; }
+    .modal { width:min(740px,100%); max-height:85vh; overflow:auto; background:var(--panel); border:1px solid #34455f; border-radius:16px; box-shadow:0 25px 100px #0008; padding:24px; }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; } .modal-header h2 { font-size:18px; margin:0; }
+    .modal pre { white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.8 monospace; color:#b8c8db; background:#090f18; padding:18px; border-radius:8px; }
+    .metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; } .metric-card { background:#0b121d; border:1px solid var(--line); border-radius:10px; padding:18px; }
+    .metric-value { font:30px monospace; margin:16px 0; } .metric-card canvas { width:100%; height:100px; }
+    .metric-card small { color:var(--muted); } .source-note { color:var(--muted); font-size:12px; margin-top:20px; }
+    .field { display:grid; gap:8px; margin-bottom:18px; color:var(--muted); font-size:12px; }
+    .field input,.field select { width:100%; background:#09111d; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:12px; }
+    .primary { background:#264e79; color:#fff; border:1px solid #5089c2; border-radius:8px; padding:10px 16px; }
+    @media(max-width:1000px) { .topbar { padding:16px 20px; } main { padding:20px; } .workspace { grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr); } .top-actions { gap:10px; } .camera { min-height:400px; } }
+    @media(max-width:760px) { .topbar { align-items:start; flex-direction:column; } .mode-bar { gap:6px; } .mode-button { padding:12px 8px; gap:0; justify-content:center; } .number,.mode-button small { display:none; } .mode-button strong { font-size:10px; letter-spacing:.3px; } .workspace { grid-template-columns:1fr; } .camera { min-height:0; aspect-ratio:16/10; } .control-pad { min-height:270px; } .event { grid-template-columns:60px 95px 1fr; gap:8px; font-size:11px; } .event-arrow { display:none; } .log-toolbar { align-items:start; flex-direction:column; } .metric-grid { grid-template-columns:1fr; } }
+    @media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
   </style>
 </head>
 <body>
-  <!-- TOPBAR -->
   <header class="topbar">
-    <div class="brand">
-      <div class="brand-icon">RR</div>
-      <div>
-        <div class="brand-title">
-          RoboticRover • Centro de Operações
-          <span class="badge badge-sim" id="simBadge">SIMULAÇÃO v1.0</span>
-        </div>
-        <div class="brand-sub">Estação-Base Node-RED • Telemetria MQTT, Controle Operacional e Vídeo Híbrido</div>
-      </div>
-    </div>
-
-    <div class="status-strip">
-      <span class="badge badge-warn" id="wsBadge">
-        <span class="dot"></span>
-        <span id="wsText">WS: Conectando...</span>
-      </span>
-      <span class="badge badge-danger" id="roverOnlineBadge">
-        <span class="dot"></span>
-        <span id="roverOnlineText">ROVER: Aguardando</span>
-      </span>
-      <span class="badge badge-sim" id="lastSeenBadge">Último pacote: --</span>
-      <button class="btn-emergency" id="btnEmergencyTop" type="button" title="Atalho: Barra de Espaço ou Esc">
-        PARADA DE EMERGÊNCIA (ESPAÇO)
-      </button>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">RR</span>RoboticRover</div>
+    <div class="top-actions">
+      <a class="quiet-button" href="/#flow/rover-tab" target="_blank" rel="noopener">Fluxo Node-RED ↗</a>
+      <span class="status" id="wsStatus">WS: conectando</span>
+      <span class="status offline" id="roverStatus">Rover: aguardando</span>
+      <button class="quiet-button" id="telemetryButton" type="button">Bateria e temperatura ↗</button>
     </div>
   </header>
-
-  <main class="container">
-    <!-- TELEMETRY SECTION -->
-    <section>
-      <div class="section-title">
-        <span>Telemetria em Tempo Real (`rover/telemetria`)</span>
-        <span id="telemetrySourceLabel" style="font-family: var(--font-mono); font-size: 0.74rem;">origem: --</span>
-      </div>
-
-      <div class="telemetry-grid">
-        <!-- BATERIA -->
-        <div class="panel">
-          <div class="metric-header">
-            <span class="metric-label">CARGA DA BATERIA</span>
-            <span class="badge badge-ok" id="batteryBadge">NOMINAL</span>
-          </div>
-          <div class="metric-main">
-            <div>
-              <span class="metric-value" id="batteryValue">--.-</span>
-              <span class="metric-unit">%</span>
-            </div>
-            <div style="text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);">
-              <div id="batteryVoltageEst">~ --.- V (LiPo 3S sim)</div>
-              <div id="batteryRateLabel">Taxa: -0.002 %/amostra</div>
-            </div>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="batteryBar"></div>
-          </div>
-          <div class="sparkline-box">
-            <canvas class="sparkline-canvas" id="batterySparkline" width="360" height="64"></canvas>
-          </div>
-          <div class="metric-stats">
-            <span id="batteryMin">Mín: --%</span>
-            <span id="batteryMax">Máx: --%</span>
-            <span id="batterySamples">Amostras: 0</span>
-          </div>
+  <main>
+    <nav class="mode-bar" aria-label="Modos do Rover">
+      <button class="mode-button" data-mode="SEGURO_ESPERA" aria-pressed="false" type="button"><span class="number">01</span><span><strong>ESPERA</strong><small>Rover em repouso</small></span></button>
+      <button class="mode-button" data-mode="BUSCA" aria-pressed="false" type="button"><span class="number">02</span><span><strong>BUSCA</strong><small>Operação automática</small></span></button>
+      <button class="mode-button" data-mode="APROXIMACAO" aria-pressed="false" type="button"><span class="number">03</span><span><strong>APROXIMAÇÃO</strong><small>Operação automática</small></span></button>
+      <button class="mode-button" data-mode="CAPTURA_MANUAL" aria-pressed="false" type="button"><span class="number">04</span><span><strong>MANUAL</strong><small>Controle do operador</small></span></button>
+    </nav>
+    <section class="workspace" aria-label="Vídeo e controle">
+      <div class="camera">
+        <div class="camera-stage">
+          <video id="cameraVideo" autoplay playsinline muted hidden></video>
+          <img id="cameraImage" alt="Vídeo da câmera selecionada" hidden>
+          <iframe id="cameraFrame" title="Vídeo da câmera selecionada" allow="autoplay; fullscreen" hidden></iframe>
+          <div class="camera-empty" id="cameraEmpty"><span class="crosshair" aria-hidden="true">⌖</span><strong id="cameraEmptyTitle">Visão Rover</strong><p id="cameraEmptyMessage">Configure a câmera para receber o vídeo.</p></div>
         </div>
-
-        <!-- TEMPERATURA -->
-        <div class="panel">
-          <div class="metric-header">
-            <span class="metric-label">TEMPERATURA INTERNA</span>
-            <span class="badge badge-ok" id="tempBadge">NORMAL</span>
+        <div class="camera-top">
+          <div class="view-switch" aria-label="Câmera selecionada">
+            <button type="button" data-view="rover" aria-pressed="true">Visão Rover</button>
+            <button type="button" data-view="satellite" aria-pressed="false">Visão Satélite</button>
           </div>
-          <div class="metric-main">
-            <div>
-              <span class="metric-value" id="tempValue">--.-</span>
-              <span class="metric-unit">°C</span>
-            </div>
-            <div style="text-align: right; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);">
-              <div>Faixa operacional: 35–48 °C</div>
-              <div id="tempTrendLabel">Tendência: estável</div>
-            </div>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="tempBar"></div>
-          </div>
-          <div class="sparkline-box">
-            <canvas class="sparkline-canvas" id="tempSparkline" width="360" height="64"></canvas>
-          </div>
-          <div class="metric-stats">
-            <span id="tempMin">Mín: -- °C</span>
-            <span id="tempAvg">Méd: -- °C</span>
-            <span id="tempMax">Máx: -- °C</span>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- CAMERA + CONTROLS -->
-    <section class="workspace-grid">
-      <!-- HYBRID CAMERA PANEL -->
-      <div class="panel">
-        <div class="cam-toolbar">
-          <div class="metric-label">CÂMERA DO ROVER (WEBRTC / MJPEG / SIMULADOR HUD)</div>
-          <div class="tab-group" role="tablist">
-            <button class="tab-btn active" data-cam-mode="sim" type="button">Simulador HUD</button>
-            <button class="tab-btn" data-cam-mode="webrtc" type="button">WebRTC (WHEP)</button>
-            <button class="tab-btn" data-cam-mode="iframe" type="button">WebRTC (Player/Iframe)</button>
-            <button class="tab-btn" data-cam-mode="mjpeg" type="button">MJPEG HTTP</button>
-          </div>
-        </div>
-
-        <div class="cam-config-bar" id="camConfigBar" style="display: none;">
-          <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600;" id="camUrlLabel">Endpoint:</span>
-          <input class="cam-input" id="camUrlInput" type="text" placeholder="http://192.168.1.50:8889/rover/whep" />
-          <button class="btn btn-primary" id="btnCamConnect" type="button">Conectar</button>
-          <button class="btn" id="btnCamDisconnect" type="button">Parar</button>
-          <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;">
-            <input type="checkbox" id="chkHudOverlay" checked /> HUD
-          </label>
-        </div>
-
-        <div class="cam-stage">
-          <video id="camVideo" autoplay playsinline muted style="display: none;"></video>
-          <img id="camMjpeg" alt="Stream MJPEG do Rover" style="display: none;" />
-          <iframe id="camIframe" title="Player WebRTC Embarcado" style="display: none; border: none;" allow="autoplay; fullscreen"></iframe>
-          <canvas id="camHudCanvas" width="768" height="432"></canvas>
-        </div>
-
-        <div class="cam-info-note">
-          <strong>Protocolos de Câmera na Raspberry Pi 3:</strong>
-          Você provavelmente estava lembrando de <code>WebRTC</code> (via <strong>MediaMTX</strong>, <strong>go2rtc</strong> ou <strong>uStreamer WebRTC</strong> usando WHEP na porta <code>8889</code>) ou de <code>MJPEG sobre HTTP</code> (via <strong>uStreamer</strong> / <strong>mjpg-streamer</strong> na porta <code>8080</code>). Enquanto a câmera física não está conectada, o modo <strong>Simulador HUD</strong> renderiza a visão sintética sincronizada com os sensores e o estado atual do Rover.
+          <button class="quiet-button camera-settings" id="cameraSettingsButton" title="Configurar câmera" aria-label="Configurar câmera" type="button">⚙</button>
         </div>
       </div>
-
-      <!-- STATE MACHINE & MANUAL CONTROLS -->
-      <div class="panel">
-        <div class="section-title" style="margin-bottom: 0;">
-          <span>Máquina de Estados &amp; Navegação (`rover/estado`, `rover/cmd/*`)</span>
-          <span class="badge badge-sim" id="motionBadge">MOVIMENTO: PARAR</span>
-        </div>
-
-        <div class="state-banner">
-          <div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">ESTADO OPERACIONAL ATUAL</div>
-            <div class="state-current" id="currentStateText">SEGURO_ESPERA</div>
+      <div class="control-panel">
+        <div class="control-pad" id="controlPad" data-locked="true" aria-label="Controle manual bloqueado">
+          <div class="control-tools">
+            <button class="info-button" id="controlHelpButton" type="button" aria-label="Informações dos controles" title="Como controlar · cliques, WASD e setas">ⓘ</button>
+            <button id="controlTargetButton" type="button" aria-label="Alternar entre pilotar Rover e controlar braço" disabled>Pilotar Rover ⇄</button>
           </div>
-          <div style="text-align: right;">
-            <div class="state-meta" id="prevStateText">anterior: --</div>
-            <div class="state-meta" id="stateReasonText">motivo: inicializando</div>
+          <div class="pad">
+            <span></span><button class="direction" data-action="AVANCAR" aria-label="Avançar" title="Avançar · W / ↑" disabled type="button">↑</button><span></span>
+            <button class="direction" data-action="ESQUERDA" aria-label="Esquerda" title="Esquerda · A / ←" disabled type="button">←</button>
+            <button class="direction stop" data-action="PARAR" aria-label="Parar" title="Parar o controle selecionado · Esc" disabled type="button">■</button>
+            <button class="direction" data-action="DIREITA" aria-label="Direita" title="Direita · D / →" disabled type="button">→</button>
+            <span></span><button class="direction" data-action="RECUAR" aria-label="Recuar" title="Recuar · S / ↓" disabled type="button">↓</button><span></span>
           </div>
         </div>
-
-        <div style="font-size: 0.76rem; color: var(--text-muted);">
-          Clique para comandar mudança de modo (o botão destacado em azul é o próximo passo válido da sequência):
-        </div>
-
-        <div class="mode-pipeline">
-          <button class="mode-btn active-state" data-mode="SEGURO_ESPERA" type="button">
-            <span class="step-tag">0 • SEGURO</span>
-            <span>SEGURO_ESPERA</span>
-          </button>
-          <button class="mode-btn next-valid" data-mode="BUSCA" type="button">
-            <span class="step-tag">1 • INÍCIO</span>
-            <span>BUSCA</span>
-          </button>
-          <button class="mode-btn" data-mode="APROXIMACAO" type="button">
-            <span class="step-tag">2 • ALVO</span>
-            <span>APROXIMACAO</span>
-          </button>
-          <button class="mode-btn" data-mode="AGUARDANDO_PEGA" type="button">
-            <span class="step-tag">3 • POSIÇÃO</span>
-            <span>AGUARDANDO_PEGA</span>
-          </button>
-          <button class="mode-btn" data-mode="CAPTURA_MANUAL" type="button">
-            <span class="step-tag">4 • OPERADOR</span>
-            <span>CAPTURA_MANUAL</span>
-          </button>
-        </div>
-
-        <div class="manual-grid">
-          <div class="dpad">
-            <div></div>
-            <button class="dpad-btn" data-action="AVANCAR" type="button">
-              <span>▲ AVANÇAR</span>
-              <kbd>W / ↑</kbd>
-            </button>
-            <div></div>
-
-            <button class="dpad-btn" data-action="ESQUERDA" type="button">
-              <span>◀ ESQ</span>
-              <kbd>A / ←</kbd>
-            </button>
-            <button class="dpad-btn dpad-stop" data-action="PARAR" type="button">
-              <span>■ PARAR</span>
-              <kbd>ESPAÇO</kbd>
-            </button>
-            <button class="dpad-btn" data-action="DIREITA" type="button">
-              <span>DIR ▶</span>
-              <kbd>D / →</kbd>
-            </button>
-
-            <div></div>
-            <button class="dpad-btn" data-action="RECUAR" type="button">
-              <span>▼ RECUAR</span>
-              <kbd>S / ↓</kbd>
-            </button>
-            <div></div>
-          </div>
-
-          <div class="manual-options">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>Duração do pulso manual:</span>
-              <strong style="font-family: var(--font-mono); color: var(--accent);" id="durationLabel">500 ms</strong>
-            </div>
-            <input type="range" id="durationSlider" min="100" max="1000" step="50" value="500" />
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-              <input type="checkbox" id="chkKeyboard" checked />
-              Atalhos de teclado (WASD / Setas / Espaço)
-            </label>
-            <div style="font-size: 0.72rem; color: var(--text-dim);">
-              Movimentos exigem <code>CAPTURA_MANUAL</code> e expiram localmente no Rover se não renovados. <code>PARAR</code> funciona em qualquer modo.
-            </div>
-          </div>
-        </div>
-
-        <div class="ack-box" id="ackBox">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted);">ÚLTIMO ACK (`rover/cmd/ack`)</span>
-            <span class="badge badge-sim" id="ackStatusBadge">AGUARDANDO COMANDO</span>
-          </div>
-          <div id="ackDetails" style="color: var(--text-main);">Nenhum comando enviado nesta sessão.</div>
+        <div class="summary">
+          <div class="summary-card"><span class="eyebrow">Estado atual</span><strong id="currentState">Aguardando</strong><small id="stateReason">Sem estado confirmado</small></div>
+          <div class="summary-card"><span class="eyebrow">Último ACK</span><strong id="lastAck">—</strong><small id="ackReason">Nenhum comando confirmado</small></div>
         </div>
       </div>
     </section>
-
-    <!-- ALARMS & LOGS -->
-    <section class="feed-grid">
-      <div class="panel">
-        <div class="section-title" style="margin-bottom: 0;">
-          <span>Alarmes e Confirmações (`rover/alarme`, `rover/cmd/ack`)</span>
-          <button class="btn" id="btnClearAlarms" type="button" style="padding: 2px 8px; font-size: 0.7rem;">Limpar</button>
-        </div>
-        <div class="event-list" id="alarmList"></div>
-      </div>
-
-      <div class="panel">
-        <div class="section-title" style="margin-bottom: 0;">
-          <span>Logs Operacionais (`rover/log`)</span>
-          <button class="btn" id="btnClearLogs" type="button" style="padding: 2px 8px; font-size: 0.7rem;">Limpar</button>
-        </div>
-        <div class="event-list" id="logList"></div>
-      </div>
+    <section class="log-panel" aria-label="Histórico de operações">
+      <div class="log-toolbar"><div><strong>Registro de operações</strong><span id="eventCount">0 eventos</span></div><div class="log-actions"><select id="logFilter" aria-label="Filtrar registros"><option value="all">Todos os eventos</option><option value="state">Estados</option><option value="warn">Avisos</option><option value="error">Erros</option><option value="ack">Confirmações</option></select><button class="quiet-button" id="clearLog" type="button">Limpar</button></div></div>
+      <div class="event-list" id="eventList"><div class="log-empty">Aguardando os primeiros eventos do Rover.</div></div>
     </section>
+    <div class="footer"><span id="connectionAge">Aguardando comunicação</span><span id="executionLabel">Fonte de dados não confirmada</span></div>
   </main>
-
+  <div class="modal-backdrop" id="controlHelpModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="controlHelpTitle" tabindex="-1"><div class="modal-header"><h2 id="controlHelpTitle">Como controlar o Rover</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><div class="help-copy"><p><strong>Quando o controle é liberado?</strong> Ao receber a confirmação de conclusão da aproximação, o operador pode coletar a peça com o braço e depois pilotar até a área segura. Durante BUSCA e APROXIMAÇÃO, todos os botões do direcional e os atalhos ficam bloqueados e apagados.</p><p><strong>Parada forçada:</strong> pressione <kbd>Espaço</kbd> fora de campos de edição para parar a operação automática e solicitar o modo manual. A liberação depende da confirmação do Rover. Para retomar a busca automática, clique em <strong>BUSCA</strong>.</p><p><strong>Pilotar Rover:</strong> <kbd>W</kbd> / <kbd>↑</kbd> avança; <kbd>S</kbd> / <kbd>↓</kbd> recua; <kbd>A</kbd> / <kbd>←</kbd> vira à esquerda; <kbd>D</kbd> / <kbd>→</kbd> vira à direita.</p><p><strong>Controlar braço:</strong> use o alternador no canto superior direito. <kbd>W</kbd> / <kbd>↑</kbd> solicita subir; <kbd>S</kbd> / <kbd>↓</kbd> solicita descer; <kbd>A</kbd> / <kbd>←</kbd> e <kbd>D</kbd> / <kbd>→</kbd> solicitam deslocamento lateral do braço. Os comandos são identificados como manipulador e não acionam as rodas.</p><p>Você também pode clicar nas setas. <kbd>■</kbd> ou <kbd>Esc</kbd> interrompe o controle manual. Cada comando tem duração limitada de 500 ms. Trocar entre Rover e braço envia uma parada antes da troca. Perder conexão ou voltar ao automático bloqueia os controles.</p><p>Os clientes atuais apenas simulam os comandos. O braço ainda depende de integração e calibração física, incluindo captura e soltura.</p></div></section></div>
+  <div class="modal-backdrop" id="detailsModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="detailsTitle" tabindex="-1"><div class="modal-header"><h2 id="detailsTitle">Detalhes do evento</h2><button class="quiet-button" data-close type="button" aria-label="Fechar detalhes">Fechar ✕</button></div><pre id="eventDetails"></pre></section></div>
+  <div class="modal-backdrop" id="telemetryModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="telemetryTitle" tabindex="-1"><div class="modal-header"><h2 id="telemetryTitle">Bateria e temperatura</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><div class="metric-grid"><div class="metric-card"><span class="eyebrow">Bateria</span><div class="metric-value" id="batteryValue">— %</div><canvas id="batteryChart" width="560" height="180" aria-label="Histórico da bateria"></canvas><small id="batterySummary">Sem amostras</small></div><div class="metric-card"><span class="eyebrow">Temperatura</span><div class="metric-value" id="temperatureValue">— °C</div><canvas id="temperatureChart" width="560" height="180" aria-label="Histórico da temperatura"></canvas><small id="temperatureSummary">Sem amostras</small></div></div><p class="source-note" id="telemetrySource">Telemetria MQTT · aguardando dados</p></section></div>
+  <div class="modal-backdrop" id="cameraModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="cameraTitle" tabindex="-1"><div class="modal-header"><h2 id="cameraTitle">Configurar câmera</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><form id="cameraForm"><label class="field">Transmissão<select id="cameraProtocol"><option value="mjpeg">MJPEG HTTP</option><option value="webrtc">WebRTC (WHEP)</option><option value="iframe">Player WebRTC</option></select></label><label class="field">Endereço do vídeo<input id="cameraUrl" type="url" placeholder="http://192.168.1.50:8080/?action=stream" required></label><button class="primary" type="submit">Conectar câmera</button><button class="quiet-button" id="disconnectCamera" type="button">Desconectar</button></form></section></div>
   <script>
-    (function () {
-      "use strict";
-
-      const VALID_NEXT = {
-        SEGURO_ESPERA: ["BUSCA"],
-        BUSCA: ["APROXIMACAO"],
-        APROXIMACAO: ["AGUARDANDO_PEGA"],
-        AGUARDANDO_PEGA: ["CAPTURA_MANUAL"],
-        CAPTURA_MANUAL: ["BUSCA"]
-      };
-
-      const state = {
-        wsConnected: false,
-        roverOnline: false,
-        roverReason: "aguardando",
-        source: "--",
-        lastPacketMs: null,
-        currentState: "SEGURO_ESPERA",
-        previousState: "SEGURO_ESPERA",
-        stateReason: "inicializando",
-        motion: "PARAR",
-        telemetry: {
-          battery_percent: null,
-          temperature_c: null
-        },
-        history: {
-          battery: [],
-          temperature: []
-        },
-        camMode: "sim",
-        webrtcPc: null,
-        simTick: 0
-      };
-
-      // DOM elements
-      const wsBadge = document.getElementById("wsBadge");
-      const wsText = document.getElementById("wsText");
-      const roverOnlineBadge = document.getElementById("roverOnlineBadge");
-      const roverOnlineText = document.getElementById("roverOnlineText");
-      const lastSeenBadge = document.getElementById("lastSeenBadge");
-      const telemetrySourceLabel = document.getElementById("telemetrySourceLabel");
-
-      const batteryValue = document.getElementById("batteryValue");
-      const batteryBadge = document.getElementById("batteryBadge");
-      const batteryVoltageEst = document.getElementById("batteryVoltageEst");
-      const batteryBar = document.getElementById("batteryBar");
-      const batteryMin = document.getElementById("batteryMin");
-      const batteryMax = document.getElementById("batteryMax");
-      const batterySamples = document.getElementById("batterySamples");
-      const batterySparkline = document.getElementById("batterySparkline");
-
-      const tempValue = document.getElementById("tempValue");
-      const tempBadge = document.getElementById("tempBadge");
-      const tempTrendLabel = document.getElementById("tempTrendLabel");
-      const tempBar = document.getElementById("tempBar");
-      const tempMin = document.getElementById("tempMin");
-      const tempAvg = document.getElementById("tempAvg");
-      const tempMax = document.getElementById("tempMax");
-      const tempSparkline = document.getElementById("tempSparkline");
-
-      const currentStateText = document.getElementById("currentStateText");
-      const prevStateText = document.getElementById("prevStateText");
-      const stateReasonText = document.getElementById("stateReasonText");
-      const motionBadge = document.getElementById("motionBadge");
-      const ackStatusBadge = document.getElementById("ackStatusBadge");
-      const ackDetails = document.getElementById("ackDetails");
-
-      const alarmList = document.getElementById("alarmList");
-      const logList = document.getElementById("logList");
-
-      const durationSlider = document.getElementById("durationSlider");
-      const durationLabel = document.getElementById("durationLabel");
-      const chkKeyboard = document.getElementById("chkKeyboard");
-
-      const camConfigBar = document.getElementById("camConfigBar");
-      const camUrlLabel = document.getElementById("camUrlLabel");
-      const camUrlInput = document.getElementById("camUrlInput");
-      const camVideo = document.getElementById("camVideo");
-      const camMjpeg = document.getElementById("camMjpeg");
-      const camIframe = document.getElementById("camIframe");
-      const camHudCanvas = document.getElementById("camHudCanvas");
-      const chkHudOverlay = document.getElementById("chkHudOverlay");
-
-      function formatTime(iso) {
-        if (!iso) return new Date().toLocaleTimeString("pt-BR");
-        const d = new Date(iso);
-        return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleTimeString("pt-BR");
+  (() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const labels = {SEGURO_ESPERA:'Espera',BUSCA:'Busca',APROXIMACAO:'Aproximação',AGUARDANDO_PEGA:'Aguardando captura',CAPTURA_MANUAL:'Manual',RETORNO:'Retorno',DEPOSITO:'Depósito'};
+    const state = {mode:null,online:false,ws:false,fresh:false,source:null,lastStatus:0,lastPacket:0,manualEnabled:false,target:'rover',authorizing:false,events:[],seen:new Set(),history:[],view:'rover',cameraGeneration:0,pc:null,cameraAbort:null,latestStateTime:0};
+    const pending = new Map();
+    let socket, activeModal, restoreFocus;
+    function showModal(id) { if(activeModal) closeModal(); restoreFocus=document.activeElement; activeModal=$(id); activeModal.hidden=false; activeModal.querySelector('[role="dialog"]').focus(); }
+    function closeModal() { if(!activeModal)return; activeModal.hidden=true; activeModal=null; if(restoreFocus)restoreFocus.focus(); }
+    document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeModal));
+    document.querySelectorAll('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal();}));
+    document.addEventListener('keydown',e=>{
+      if(!activeModal)return;
+      if(e.key==='Escape'){e.preventDefault();closeModal();return;}
+      if(e.key==='Tab') {const nodes=[...activeModal.querySelectorAll('button,input,select,[tabindex="0"]')].filter(n=>!n.disabled);const first=nodes[0],last=nodes[nodes.length-1]; if(e.shiftKey&&(document.activeElement===first||document.activeElement===activeModal.querySelector('[role="dialog"]'))){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+    });
+    function addEvent(packet, category, title, kind='info') {
+      const key=JSON.stringify(packet); if(state.seen.has(key))return;
+      state.seen.add(key); state.events.push({key,packet,category,title,kind});
+      if(state.events.length>200){const old=state.events.shift();state.seen.delete(old.key);}
+      state.events.sort((a,b)=>Date.parse(a.packet.timestamp)-Date.parse(b.packet.timestamp));
+      renderLog();
+    }
+    function localEvent(title,kind='warn',data={}) {addEvent({timestamp:new Date().toISOString(),source:'dashboard',type:'log',data:{message:title,...data}},'log',title,kind);}
+    function renderLog() {
+      const list=$('eventList'),filter=$('logFilter').value; list.replaceChildren();
+      const events=state.events.filter(e=>filter==='all'||e.category===filter||e.kind===filter).slice().reverse();
+      $('eventCount').textContent=state.events.length+' eventos';
+      if(!events.length){const empty=document.createElement('div');empty.className='log-empty';empty.textContent='Nenhum evento neste filtro.';list.append(empty);return;}
+      for(const event of events){const p=event.packet,d=p.data||{},row=document.createElement('button');row.type='button';row.className='event';
+        const time=document.createElement('time');time.dateTime=p.timestamp;time.textContent=new Date(p.timestamp).toLocaleTimeString('pt-BR');
+        const tag=document.createElement('span');tag.className='event-tag';tag.dataset.kind=event.kind;
+        tag.textContent=event.category==='state'?(labels[d.state]||d.state):event.kind==='error'?'ERRO':event.kind==='warn'?'AVISO':event.category==='ack'?'ACK':event.category==='status'?'CONEXÃO':'INFO';
+        if(event.category==='state')tag.dataset.state=d.state;
+        const text=document.createElement('span');text.className='event-message';text.textContent=event.title;
+        const arrow=document.createElement('span');arrow.className='event-arrow';arrow.textContent='↗';
+        row.append(time,tag,text,arrow);row.addEventListener('click',()=>{$('detailsTitle').textContent=event.title;$('eventDetails').textContent=JSON.stringify(p,null,2);showModal('detailsModal');});list.append(row);
       }
-
-      function pushEvent(container, text, level, isoTime) {
-        const div = document.createElement("div");
-        div.className = "event-item" + (level === "warn" ? " warn" : level === "error" ? " error" : "");
-        const msgSpan = document.createElement("span");
-        msgSpan.textContent = text;
-        const timeSpan = document.createElement("span");
-        timeSpan.className = "event-time";
-        timeSpan.textContent = formatTime(isoTime);
-        div.appendChild(msgSpan);
-        div.appendChild(timeSpan);
-        container.prepend(div);
-        while (container.children.length > 40) {
-          container.removeChild(container.lastChild);
-        }
-      }
-
-      function drawSparkline(canvas, values, strokeColor, fillColor, minRef, maxRef) {
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-
-        // Grid lines
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
-        ctx.lineWidth = 1;
-        for (let i = 1; i <= 2; i++) {
-          const y = (h / 3) * i;
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(w, y);
-          ctx.stroke();
-        }
-
-        if (!values || values.length === 0) return;
-
-        const minVal = minRef !== undefined ? Math.min(minRef, ...values) : Math.min(...values) - 0.5;
-        const maxVal = maxRef !== undefined ? Math.max(maxRef, ...values) : Math.max(...values) + 0.5;
-        const span = Math.max(0.01, maxVal - minVal);
-
-        const pts = values.map((v, idx) => {
-          const x = values.length === 1 ? w / 2 : (idx / (values.length - 1)) * (w - 8) + 4;
-          const y = h - 6 - ((v - minVal) / span) * (h - 12);
-          return [x, y];
-        });
-
-        ctx.beginPath();
-        pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.lineTo(pts[pts.length - 1][0], h);
-        ctx.lineTo(pts[0][0], h);
-        ctx.closePath();
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-      }
-
-      function updateTelemetryUI(envelope) {
-        const d = envelope.data || {};
-        state.source = envelope.source || state.source;
-        telemetrySourceLabel.textContent = "origem: " + state.source + " • " + formatTime(envelope.timestamp);
-
-        let bat = Number(d.battery_percent);
-        const voltageDirect = Number(d.battery_voltage_v);
-        if (!Number.isFinite(bat) && Number.isFinite(voltageDirect)) {
-          bat = Math.max(0, Math.min(100, ((voltageDirect - 9.6) / 3.0) * 100));
-        }
-        const temp = Number(d.temperature_c);
-
-        if (Number.isFinite(bat)) {
-          state.telemetry.battery_percent = bat;
-          state.history.battery.push(bat);
-          if (state.history.battery.length > 60) state.history.battery.shift();
-
-          batteryValue.textContent = bat.toFixed(2);
-          const voltage = Number.isFinite(voltageDirect) ? voltageDirect : 9.6 + (bat / 100) * 3.0;
-          batteryVoltageEst.textContent = "~ " + voltage.toFixed(2) + " V (LiPo 3S sim)";
-          batteryBar.style.width = Math.max(0, Math.min(100, bat)) + "%";
-
-          if (bat < 20) {
-            batteryBadge.className = "badge badge-danger";
-            batteryBadge.textContent = "CRÍTICA";
-            batteryBar.style.background = "#ef4444";
-          } else if (bat < 50) {
-            batteryBadge.className = "badge badge-warn";
-            batteryBadge.textContent = "ATENÇÃO";
-            batteryBar.style.background = "#f59e0b";
-          } else {
-            batteryBadge.className = "badge badge-ok";
-            batteryBadge.textContent = "NOMINAL";
-            batteryBar.style.background = "linear-gradient(90deg, #10b981, #34d399)";
-          }
-
-          const bArr = state.history.battery;
-          batteryMin.textContent = "Mín: " + Math.min(...bArr).toFixed(2) + "%";
-          batteryMax.textContent = "Máx: " + Math.max(...bArr).toFixed(2) + "%";
-          batterySamples.textContent = "Amostras: " + bArr.length;
-          drawSparkline(batterySparkline, bArr, "#10b981", "rgba(16, 185, 129, 0.16)");
-        }
-
-        if (Number.isFinite(temp)) {
-          state.telemetry.temperature_c = temp;
-          state.history.temperature.push(temp);
-          if (state.history.temperature.length > 60) state.history.temperature.shift();
-
-          tempValue.textContent = temp.toFixed(1);
-          const pct = Math.max(0, Math.min(100, ((temp - 20) / 40) * 100));
-          tempBar.style.width = pct + "%";
-
-          if (temp >= 47.5) {
-            tempBadge.className = "badge badge-danger";
-            tempBadge.textContent = "ALTA";
-            tempBar.style.background = "#ef4444";
-          } else if (temp >= 45.0) {
-            tempBadge.className = "badge badge-warn";
-            tempBadge.textContent = "ELEVADA";
-            tempBar.style.background = "#f59e0b";
-          } else {
-            tempBadge.className = "badge badge-ok";
-            tempBadge.textContent = "NORMAL";
-            tempBar.style.background = "linear-gradient(90deg, #38bdf8, #10b981)";
-          }
-
-          const tArr = state.history.temperature;
-          const avg = tArr.reduce((a, b) => a + b, 0) / tArr.length;
-          tempMin.textContent = "Mín: " + Math.min(...tArr).toFixed(1) + " °C";
-          tempAvg.textContent = "Méd: " + avg.toFixed(1) + " °C";
-          tempMax.textContent = "Máx: " + Math.max(...tArr).toFixed(1) + " °C";
-          tempTrendLabel.textContent = "Média recente: " + avg.toFixed(1) + " °C";
-          drawSparkline(tempSparkline, tArr, "#38bdf8", "rgba(56, 189, 248, 0.16)", 36, 50);
-        }
-
-      }
-
-      function updateStateUI(envelope) {
-        const d = envelope.data || {};
-        state.currentState = d.state || state.currentState;
-        state.previousState = d.previous_state || state.previousState;
-        state.stateReason = d.reason || (d.hardware_actuation === false ? "validação sem atuação física" : state.stateReason);
-        state.motion = d.motion || "PARAR";
-
-        currentStateText.textContent = state.currentState;
-        prevStateText.textContent = "anterior: " + state.previousState;
-        stateReasonText.textContent = "motivo: " + state.stateReason;
-
-        motionBadge.textContent = "MOVIMENTO: " + state.motion;
-        motionBadge.className = state.motion === "PARAR" ? "badge badge-sim" : "badge badge-warn";
-
-        const nextValid = VALID_NEXT[state.currentState] || [];
-        document.querySelectorAll(".mode-btn").forEach((btn) => {
-          const m = btn.getAttribute("data-mode");
-          btn.classList.toggle("active-state", m === state.currentState);
-          btn.classList.toggle("next-valid", m !== state.currentState && nextValid.includes(m));
-        });
-      }
-
-      function updateStatusUI(envelope) {
-        const d = envelope.data || {};
-        state.roverOnline = Boolean(d.online);
-        state.roverReason = d.reason || d.mode || (d.hostname ? "host=" + d.hostname : "");
-        const simBadge = document.getElementById("simBadge");
-        if (simBadge) {
-          simBadge.textContent = envelope.simulated === false ? "PI 3 MQTT • SEM ATUAÇÃO FÍSICA" : "SIMULAÇÃO v1.0";
-        }
-        if (state.roverOnline) {
-          roverOnlineBadge.className = "badge badge-ok";
-          const hostInfo = d.hostname ? " • " + d.hostname : "";
-          roverOnlineText.textContent = "ROVER: ONLINE (" + (envelope.source || "sim") + hostInfo + ")";
-        } else {
-          roverOnlineBadge.className = "badge badge-danger";
-          roverOnlineText.textContent = "ROVER: OFFLINE (" + (state.roverReason || "desconectado") + ")";
-        }
-      }
-
-      function updateAckUI(envelope) {
-        const d = envelope.data || {};
-        const ok = Boolean(d.accepted);
-        ackStatusBadge.className = ok ? "badge badge-ok" : "badge badge-danger";
-        ackStatusBadge.textContent = ok ? "ACEITO (" + d.reason + ")" : "REJEITADO (" + d.reason + ")";
-        const topicOrExec = d.topic ? "Tópico: " + d.topic : "Execução: " + (d.execution || "simulated_only");
-        ackDetails.textContent =
-          topicOrExec +
-          " | Estado: " + d.state +
-          (d.duplicate ? " (DUPLICATA)" : "") +
-          (d.command_id ? " | ID: " + String(d.command_id).slice(0, 8) + "…" : "");
-
-        pushEvent(
-          alarmList,
-          "[ACK] " + (ok ? "ACEITO" : "REJEITADO") + " • " + d.reason + " → estado=" + d.state,
-          ok ? "info" : "warn",
-          envelope.timestamp
-        );
-      }
-
-      function handleEnvelope(envelope) {
-        if (!envelope || typeof envelope !== "object") return;
-        state.lastPacketMs = Date.now();
-
-        switch (envelope.type) {
-          case "telemetry":
-            updateTelemetryUI(envelope);
-            break;
-          case "state":
-            updateStateUI(envelope);
-            break;
-          case "status":
-            updateStatusUI(envelope);
-            break;
-          case "ack":
-            updateAckUI(envelope);
-            break;
-          case "alarm": {
-            const d = envelope.data || {};
-            pushEvent(
-              alarmList,
-              "[ALARME • " + (d.code || "ALERTA") + "] " + (d.message || ""),
-              d.severity === "critical" ? "error" : "warn",
-              envelope.timestamp
-            );
-            break;
-          }
-          case "log": {
-            const d = envelope.data || {};
-            pushEvent(
-              logList,
-              "[" + (d.level || "INFO") + " • " + (d.event || "log") + "] " + (d.message || ""),
-              d.level === "ERROR" ? "error" : d.level === "WARNING" ? "warn" : "info",
-              envelope.timestamp
-            );
-            break;
-          }
-        }
-      }
-
-      // Send Command via WebSocket or HTTP fallback
-      let ws = null;
-
-      function sendCommand(payloadObj) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify(payloadObj));
-          return;
-        }
-        fetch("/api/rover/command", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payloadObj)
-        }).catch((err) => {
-          console.error("Falha ao enviar comando HTTP:", err);
-        });
-      }
-
-      function sendMode(mode) {
-        sendCommand({ kind: "mode", mode: mode });
-      }
-
-      function sendManual(action) {
-        const duration = parseInt(durationSlider.value, 10) || 500;
-        sendCommand({ kind: "manual", action: action, duration_ms: duration });
-      }
-
-      // Connect WebSocket & fetch initial snapshot
-      function loadSnapshot() {
-        fetch("/api/rover/snapshot")
-          .then((r) => (r.ok ? r.json() : null))
-          .then((snap) => {
-            if (!snap) return;
-            if (Array.isArray(snap.history)) {
-              state.history.battery = snap.history
-                .map((h) => Number(h.battery_percent))
-                .filter(Number.isFinite);
-              state.history.temperature = snap.history
-                .map((h) => Number(h.temperature_c))
-                .filter(Number.isFinite);
-            }
-            if (snap.status) handleEnvelope(snap.status);
-            if (snap.state) handleEnvelope(snap.state);
-            if (snap.telemetry) handleEnvelope(snap.telemetry);
-            if (snap.last_ack) updateAckUI(snap.last_ack);
-            if (Array.isArray(snap.alarms)) {
-              snap.alarms.slice().reverse().forEach(handleEnvelope);
-            }
-            if (Array.isArray(snap.logs)) {
-              snap.logs.slice().reverse().forEach(handleEnvelope);
-            }
-          })
-          .catch(() => {});
-      }
-
-      function connectWebSocket() {
-        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const url = proto + "//" + window.location.host + "/ws/rover";
-        ws = new WebSocket(url);
-
-        ws.onopen = function () {
-          state.wsConnected = true;
-          wsBadge.className = "badge badge-ok";
-          wsText.textContent = "WS: Conectado";
-          loadSnapshot();
-        };
-
-        ws.onmessage = function (ev) {
-          try {
-            const msg = JSON.parse(ev.data);
-            handleEnvelope(msg);
-          } catch (_) {}
-        };
-
-        ws.onclose = function () {
-          state.wsConnected = false;
-          wsBadge.className = "badge badge-warn";
-          wsText.textContent = "WS: Reconectando...";
-          setTimeout(connectWebSocket, 1500);
-        };
-
-        ws.onerror = function () {
-          try {
-            ws.close();
-          } catch (_) {}
-        };
-      }
-
-      // Hybrid Camera Controller (Sim HUD + WebRTC WHEP + WebRTC Iframe + MJPEG)
-      function stopRealStreams() {
-        if (state.webrtcPc) {
-          try {
-            state.webrtcPc.close();
-          } catch (_) {}
-          state.webrtcPc = null;
-        }
-        camVideo.srcObject = null;
-        camVideo.style.display = "none";
-        camMjpeg.removeAttribute("src");
-        camMjpeg.style.display = "none";
-        camIframe.src = "about:blank";
-        camIframe.style.display = "none";
-      }
-
-      async function connectWebRtcWhep(whepUrl) {
-        stopRealStreams();
-        camVideo.style.display = "block";
-        try {
-          const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-          });
-          state.webrtcPc = pc;
-          pc.addTransceiver("video", { direction: "recvonly" });
-          pc.ontrack = (event) => {
-            if (event.streams && event.streams[0]) {
-              camVideo.srcObject = event.streams[0];
-            }
-          };
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-
-          const res = await fetch(whepUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/sdp" },
-            body: pc.localDescription.sdp
-          });
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          const answerSdp = await res.text();
-          await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
-          pushEvent(logList, "[CAMERA] WebRTC WHEP conectado em " + whepUrl, "info");
-        } catch (err) {
-          pushEvent(
-            alarmList,
-            "[CAMERA] Falha ao negociar WebRTC WHEP (" + err.message + "). Verifique se MediaMTX/go2rtc está ativo.",
-            "warn"
-          );
-        }
-      }
-
-      function setCameraMode(mode) {
-        state.camMode = mode;
-        document.querySelectorAll("[data-cam-mode]").forEach((b) => {
-          b.classList.toggle("active", b.getAttribute("data-cam-mode") === mode);
-        });
-
-        stopRealStreams();
-
-        if (mode === "sim") {
-          camConfigBar.style.display = "none";
-          camHudCanvas.style.display = "block";
-        } else {
-          camConfigBar.style.display = "flex";
-          camHudCanvas.style.display = chkHudOverlay.checked ? "block" : "none";
-          const saved = localStorage.getItem("rover_cam_url_" + mode);
-          if (mode === "webrtc") {
-            camUrlLabel.textContent = "Endpoint WHEP:";
-            camUrlInput.value = saved || "http://192.168.1.50:8889/rover/whep";
-          } else if (mode === "iframe") {
-            camUrlLabel.textContent = "URL Player WebRTC:";
-            camUrlInput.value = saved || "http://192.168.1.50:8889/rover";
-          } else if (mode === "mjpeg") {
-            camUrlLabel.textContent = "URL Stream MJPEG:";
-            camUrlInput.value = saved || "http://192.168.1.50:8080/?action=stream";
-          }
-        }
-      }
-
-      document.querySelectorAll("[data-cam-mode]").forEach((btn) => {
-        btn.addEventListener("click", () => setCameraMode(btn.getAttribute("data-cam-mode")));
+    }
+    function clearPending(reason) {for(const request of pending.values()){clearTimeout(request.timer);request.reject(new Error(reason));}pending.clear();}
+    function connected(){return state.ws&&state.online&&state.fresh;}
+    function manualAllowed(){return connected()&&state.manualEnabled&&!state.authorizing&&['CAPTURA_MANUAL','AGUARDANDO_PEGA','SEGURO_ESPERA'].includes(state.mode);}
+    function updateControls(){
+      const allowed=manualAllowed();$('controlPad').dataset.locked=String(!allowed);$('controlPad').setAttribute('aria-label',allowed?'Controle manual habilitado':'Controle manual bloqueado');
+      document.querySelectorAll('[data-action]').forEach(b=>{b.disabled=!allowed;const arm=state.target==='manipulator';const label=({AVANCAR:arm?'Subir braço':'Avançar Rover',RECUAR:arm?'Descer braço':'Recuar Rover',ESQUERDA:arm?'Braço à esquerda':'Rover à esquerda',DIREITA:arm?'Braço à direita':'Rover à direita',PARAR:'Parar '+(arm?'braço':'Rover')})[b.dataset.action];b.setAttribute('aria-label',label);b.title=label;});
+      $('controlTargetButton').disabled=!allowed||controlBusy;$('controlTargetButton').textContent=(state.target==='manipulator'?'Controlar braço':'Pilotar Rover')+' ⇄';
+      document.querySelectorAll('[data-mode]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode||(b.dataset.mode==='CAPTURA_MANUAL'&&state.mode==='AGUARDANDO_PEGA')));b.disabled=b.dataset.mode==='CAPTURA_MANUAL'?!manualAllowed():(b.dataset.mode!=='SEGURO_ESPERA'&&!connected());});
+    }
+    function uuid(){if(window.crypto&&window.crypto.randomUUID)return window.crypto.randomUUID();return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const a=new Uint8Array(1);window.crypto.getRandomValues(a);const r=a[0]&15;return(c==='x'?r:(r&3)|8).toString(16);});}
+    function command(body){
+      const id=uuid();
+      return new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Sem ACK do Rover dentro do prazo.'));},6000);pending.set(id,{resolve,reject,timer});
+        const packet={...body,command_id:id};
+        if(socket&&socket.readyState===WebSocket.OPEN){socket.send(JSON.stringify(packet));return;}
+        fetch('/api/rover/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(packet)}).then(r=>{if(!r.ok)throw Error('Estação recusou o comando: HTTP '+r.status);}).catch(error=>{const p=pending.get(id);if(p){clearTimeout(p.timer);pending.delete(id);reject(error);}});
       });
-
-      document.getElementById("btnCamConnect").addEventListener("click", () => {
-        const url = camUrlInput.value.trim();
-        if (!url) return;
-        localStorage.setItem("rover_cam_url_" + state.camMode, url);
-        if (state.camMode === "webrtc") {
-          connectWebRtcWhep(url);
-        } else if (state.camMode === "iframe") {
-          stopRealStreams();
-          camIframe.style.display = "block";
-          camIframe.src = url;
-        } else if (state.camMode === "mjpeg") {
-          stopRealStreams();
-          camMjpeg.style.display = "block";
-          camMjpeg.src = url;
-        }
-      });
-
-      document.getElementById("btnCamDisconnect").addEventListener("click", stopRealStreams);
-
-      chkHudOverlay.addEventListener("change", () => {
-        if (state.camMode !== "sim") {
-          camHudCanvas.style.display = chkHudOverlay.checked ? "block" : "none";
-        }
-      });
-
-      // Render Simulated Camera & Tactical HUD Overlay
-      function renderCameraHud() {
-        const ctx = camHudCanvas.getContext("2d");
-        const w = camHudCanvas.width;
-        const h = camHudCanvas.height;
-        ctx.clearRect(0, 0, w, h);
-
-        if (state.motion === "AVANCAR") state.simTick += 2.2;
-        else if (state.motion === "RECUAR") state.simTick -= 2.2;
-        else if (state.state !== "SEGURO_ESPERA") state.simTick += 0.45;
-
-        // Synthetic background when in Simulator mode
-        if (state.camMode === "sim") {
-          const sky = ctx.createLinearGradient(0, 0, 0, h * 0.52);
-          sky.addColorStop(0, "#060b16");
-          sky.addColorStop(1, "#0f1e36");
-          ctx.fillStyle = sky;
-          ctx.fillRect(0, 0, w, h * 0.52);
-
-          const ground = ctx.createLinearGradient(0, h * 0.52, 0, h);
-          ground.addColorStop(0, "#0b1526");
-          ground.addColorStop(1, "#050911");
-          ctx.fillStyle = ground;
-          ctx.fillRect(0, h * 0.52, w, h * 0.48);
-
-          // Perspective grid
-          const horizon = h * 0.52;
-          ctx.strokeStyle = "rgba(56, 189, 248, 0.2)";
-          ctx.lineWidth = 1;
-          for (let i = -8; i <= 8; i++) {
-            ctx.beginPath();
-            ctx.moveTo(w / 2 + i * 18, horizon);
-            ctx.lineTo(w / 2 + i * 120, h);
-            ctx.stroke();
-          }
-
-          const offset = ((state.simTick % 20) + 20) % 20;
-          for (let d = 1; d <= 7; d++) {
-            const norm = (d * 20 - offset) / 140;
-            const y = horizon + Math.pow(norm, 1.5) * (h - horizon);
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            ctx.stroke();
-          }
-
-          // Simulated target box based on state machine
-          if (state.currentState !== "SEGURO_ESPERA") {
-            const boxSize =
-              state.currentState === "BUSCA"
-                ? 70
-                : state.currentState === "APROXIMACAO"
-                ? 115
-                : 150;
-            const wobble =
-              state.currentState === "BUSCA" ? Math.sin(Date.now() / 600) * 90 : 0;
-            const bx = w / 2 - boxSize / 2 + wobble;
-            const by = horizon - boxSize * 0.35;
-
-            ctx.strokeStyle =
-              state.currentState === "CAPTURA_MANUAL" ? "#10b981" : "#f59e0b";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(bx, by, boxSize, boxSize);
-
-            ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-            ctx.fillRect(bx, by - 22, boxSize, 20);
-            ctx.fillStyle = "#f8fafc";
-            ctx.font = "bold 11px monospace";
-            ctx.fillText("ALVO SIMULADO [" + state.currentState + "]", bx + 6, by - 8);
-          }
-        }
-
-        // HUD Overlay (crosshair + telemetry readouts)
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.65)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(w / 2, h / 2, 26, 0, Math.PI * 2);
-        ctx.moveTo(w / 2 - 42, h / 2);
-        ctx.lineTo(w / 2 - 12, h / 2);
-        ctx.moveTo(w / 2 + 12, h / 2);
-        ctx.lineTo(w / 2 + 42, h / 2);
-        ctx.moveTo(w / 2, h / 2 - 42);
-        ctx.lineTo(w / 2, h / 2 - 12);
-        ctx.moveTo(w / 2, h / 2 + 12);
-        ctx.lineTo(w / 2, h / 2 + 42);
-        ctx.stroke();
-
-        // Top HUD bar
-        ctx.fillStyle = "rgba(9, 13, 22, 0.72)";
-        ctx.fillRect(14, 14, w - 28, 32);
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 12px monospace";
-        const batTxt =
-          state.telemetry.battery_percent !== null
-            ? state.telemetry.battery_percent.toFixed(1) + "%"
-            : "--%";
-        const tmpTxt =
-          state.telemetry.temperature_c !== null
-            ? state.telemetry.temperature_c.toFixed(1) + "°C"
-            : "--°C";
-        ctx.fillText(
-          "MODO: " +
-            state.currentState +
-            "   |   MOV: " +
-            state.motion +
-            "   |   BAT: " +
-            batTxt +
-            "   |   TEMP: " +
-            tmpTxt,
-          26,
-          34
-        );
-
-        requestAnimationFrame(renderCameraHud);
-      }
-
-      // Bind Controls
-      document.querySelectorAll(".mode-btn").forEach((btn) => {
-        btn.addEventListener("click", () => sendMode(btn.getAttribute("data-mode")));
-      });
-
-      document.querySelectorAll(".dpad-btn").forEach((btn) => {
-        btn.addEventListener("click", () => sendManual(btn.getAttribute("data-action")));
-      });
-
-      document.getElementById("btnEmergencyTop").addEventListener("click", () => {
-        sendManual("PARAR");
-      });
-
-      durationSlider.addEventListener("input", () => {
-        durationLabel.textContent = durationSlider.value + " ms";
-      });
-
-      document.getElementById("btnClearAlarms").addEventListener("click", () => {
-        alarmList.innerHTML = "";
-      });
-
-      document.getElementById("btnClearLogs").addEventListener("click", () => {
-        logList.innerHTML = "";
-      });
-
-      window.addEventListener("keydown", (ev) => {
-        if (!chkKeyboard.checked) return;
-        const tag = (ev.target && ev.target.tagName) || "";
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
-        const key = ev.key.toLowerCase();
-        let action = null;
-        if (key === " " || key === "escape") action = "PARAR";
-        else if (key === "w" || key === "arrowup") action = "AVANCAR";
-        else if (key === "s" || key === "arrowdown") action = "RECUAR";
-        else if (key === "a" || key === "arrowleft") action = "ESQUERDA";
-        else if (key === "d" || key === "arrowright") action = "DIREITA";
-
-        if (action) {
-          ev.preventDefault();
-          sendManual(action);
-        }
-      });
-
-      // Age ticker
-      setInterval(() => {
-        if (!state.lastPacketMs) {
-          lastSeenBadge.textContent = "Último pacote: aguardando";
-          return;
-        }
-        const sec = ((Date.now() - state.lastPacketMs) / 1000).toFixed(1);
-        lastSeenBadge.textContent = "Último pacote: há " + sec + "s";
-      }, 300);
-
-      connectWebSocket();
-      requestAnimationFrame(renderCameraHud);
-    })();
+    }
+    let controlBusy=false, controlGeneration=0;
+    function reportError(error){localEvent(error.message,'error');}
+    async function selectMode(mode){
+      if(mode==='SEGURO_ESPERA'){stop(false);return;}
+      if(mode==='CAPTURA_MANUAL'&&!manualAllowed())return;
+      if(controlBusy||!connected())return;
+      controlBusy=true;++controlGeneration;updateControls();
+      try {await command({kind:'mode',mode,operator_override:mode==='CAPTURA_MANUAL'&&state.mode==='SEGURO_ESPERA'});}
+      catch(error){reportError(error);}finally{controlBusy=false;updateControls();}
+    }
+    async function stop(takeControl=false){
+      const generation=++controlGeneration;state.authorizing=true;updateControls();
+      try{await command({kind:'manual',action:'PARAR',target:state.target,take_control:takeControl});if(takeControl&&generation===controlGeneration&&connected()&&state.manualEnabled){await command({kind:'mode',mode:'CAPTURA_MANUAL',operator_override:true});}}
+      catch(error){reportError(error);}finally{if(generation===controlGeneration)state.authorizing=false;updateControls();}
+    }
+    async function move(action){
+      if(!manualAllowed())return;if(action==='PARAR'){stop(false);return;}if(controlBusy)return;
+      controlBusy=true;const generation=controlGeneration;
+      const target=state.target;
+      try{if(state.mode!=='CAPTURA_MANUAL'){await command({kind:'mode',mode:'CAPTURA_MANUAL',operator_override:state.mode==='SEGURO_ESPERA'});if(generation!==controlGeneration)return;}
+        if(!connected()||state.mode!=='CAPTURA_MANUAL')return;
+        const mapped=target==='manipulator'?({AVANCAR:'SUBIR',RECUAR:'DESCER'}[action]||action):action;
+        await command({kind:'manual',action:mapped,target,duration_ms:500});
+      }catch(error){reportError(error);}finally{controlBusy=false;updateControls();}
+    }
+    function finite(value){return typeof value==='number'&&Number.isFinite(value)?value:null;}
+    function chart(id,values,color){const canvas=$(id),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);if(!values.length)return;const min=Math.min(...values),max=Math.max(...values),span=max-min||1;ctx.strokeStyle='#253041';ctx.lineWidth=1;for(let y=20;y<h;y+=45){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}ctx.beginPath();values.forEach((v,i)=>{const x=10+i/Math.max(1,values.length-1)*(w-20),y=h-15-(v-min)/span*(h-30);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.strokeStyle=color;ctx.lineWidth=3;ctx.stroke();}
+    function renderTelemetry(){const latest=state.history[state.history.length-1]||{};for(const [field,prefix,unit,color]of[['battery_percent','battery','%','#58d3a2'],['temperature_c','temperature','°C','#59a9ff']]){const values=state.history.map(h=>finite(h[field])).filter(x=>x!==null);$(prefix+'Value').textContent=(finite(latest[field])===null?'—':latest[field].toFixed(1))+' '+unit;$(prefix+'Summary').textContent=values.length?'Mín '+Math.min(...values).toFixed(1)+' · Máx '+Math.max(...values).toFixed(1)+' · '+values.length+' amostras':'Sem amostras';chart(prefix+'Chart',values,color);}}
+    function handle(packet, historical=false){
+      if(!packet||typeof packet!=='object'||packet.version!=='1.0'||!packet.data||!Number.isFinite(Date.parse(packet.timestamp)))return;
+      const d=packet.data,timestamp=Date.parse(packet.timestamp);
+      if(!historical){state.lastPacket=Date.now();if(state.online&&packet.source===state.source&&Math.abs(Date.now()-timestamp)<7000)state.fresh=true;}
+      if(packet.type==='status'){
+        if(state.source&&state.source!==packet.source){state.manualEnabled=false;state.mode=null;clearPending('A fonte do Rover mudou.');}
+        state.source=packet.source;state.online=d.online===true;state.lastStatus=Date.now();state.fresh=!historical&&Math.abs(Date.now()-timestamp)<7000;
+        $('roverStatus').textContent=state.online?'Rover: online':'Rover: offline';$('roverStatus').className='status '+(state.online?'online':'offline');
+        $('executionLabel').textContent=(packet.simulated?'Simulador':'Cliente conectado · atuação não confirmada')+' · '+packet.source;
+        if(!state.online){state.manualEnabled=false;clearPending('Rover desconectado.');}
+        addEvent(packet,'status',state.online?'Rover conectado':'Rover desconectado',state.online?'info':'warn');
+      }else if(packet.type==='state'){
+        if(timestamp>=state.latestStateTime){state.latestStateTime=timestamp;state.manualEnabled=d.manual_enabled===true;state.mode=d.state;if(d.state==='AGUARDANDO_PEGA')state.target='manipulator';
+          $('currentState').textContent=labels[d.state]||d.state;$('stateReason').textContent=d.reason||(d.hardware_actuation===false?'Validação sem atuação física':'Estado recebido');}
+        addEvent(packet,'state',(labels[d.previous_state]||d.previous_state||'Início')+' → '+(labels[d.state]||d.state));
+      }else if(packet.type==='ack'){
+        $('lastAck').textContent=d.accepted?'Aceito':'Rejeitado';$('lastAck').style.color=d.accepted?'var(--green)':'var(--red)';const targetLabel=d.control_target==='manipulator'?'Braço':'Rover';$('ackReason').textContent=targetLabel+' · '+d.reason+(d.duplicate?' · duplicata':'');
+        addEvent(packet,'ack',(d.accepted?'Comando aceito':'Comando rejeitado')+' · '+targetLabel+' · '+d.reason,d.accepted?'info':'warn');
+        if(!historical){const request=pending.get(d.command_id);if(request){clearTimeout(request.timer);pending.delete(d.command_id);d.accepted?request.resolve(d):request.reject(new Error(d.reason));}}
+      }else if(packet.type==='telemetry'){
+        const item={timestamp:packet.timestamp,battery_percent:finite(d.battery_percent),temperature_c:finite(d.temperature_c)};
+        if(!state.history.some(h=>h.timestamp===item.timestamp))state.history.push(item);state.history=state.history.slice(-120);
+        $('telemetrySource').textContent=(packet.simulated?'Valores simulados':'Telemetria recebida')+' · '+packet.source+' · '+new Date(packet.timestamp).toLocaleTimeString('pt-BR');if(!$('telemetryModal').hidden)renderTelemetry();
+      }else if(packet.type==='alarm'){if(d.severity==='critical')state.manualEnabled=false;addEvent(packet,'alarm',(d.code||'Alarme')+' · '+(d.message||''),d.severity==='critical'?'error':'warn');}
+      else if(packet.type==='log')addEvent(packet,'log',d.message||d.event||'Registro',d.level==='ERROR'?'error':d.level==='WARNING'?'warn':'info');
+      updateControls();
+    }
+    async function snapshot(){try{const response=await fetch('/api/rover/snapshot');if(!response.ok)return;const snap=await response.json();state.history=(snap.history||[]).slice(-120);for(const p of [snap.status,snap.state,snap.telemetry,snap.last_ack,...(snap.events||snap.alarms||[]),...(snap.logs||[])])if(p)handle(p,true);}catch(error){localEvent('Não foi possível carregar o histórico.','warn');}}
+    function connect(){const protocol=location.protocol==='https:'?'wss:':'ws:';socket=new WebSocket(protocol+'//'+location.host+'/ws/rover');socket.onopen=()=>{state.ws=true;$('wsStatus').textContent='WS: conectado';$('wsStatus').className='status online';snapshot();updateControls();};socket.onmessage=e=>{try{handle(JSON.parse(e.data));}catch(error){console.error(error);}};socket.onclose=()=>{state.ws=false;state.manualEnabled=false;$('wsStatus').textContent='WS: reconectando';$('wsStatus').className='status offline';clearPending('Conexão com a estação interrompida.');updateControls();setTimeout(connect,1500);};socket.onerror=()=>socket.close();}
+    function cameraConfig(){try{return JSON.parse(localStorage.getItem('roboticrover_camera_'+state.view))||{};}catch{return {};}}
+    function stopCamera(){state.cameraGeneration++;if(state.cameraAbort)state.cameraAbort.abort();state.cameraAbort=null;if(state.pc)state.pc.close();state.pc=null;$('cameraVideo').srcObject=null;for(const id of ['cameraVideo','cameraImage','cameraFrame']){const el=$(id);el.hidden=true;el.removeAttribute('src');}$('cameraEmpty').hidden=false;}
+    async function loadCamera(){stopCamera();const generation=state.cameraGeneration,config=cameraConfig();$('cameraEmptyTitle').textContent=state.view==='rover'?'Visão Rover':'Visão Satélite';$('cameraEmptyMessage').textContent='Configure a câmera para receber o vídeo.';if(!config.url)return;
+      try{if(config.protocol==='mjpeg'){$('cameraImage').src=config.url;$('cameraImage').hidden=false;return;}if(config.protocol==='iframe'){$('cameraFrame').src=config.url;$('cameraFrame').hidden=false;$('cameraEmpty').hidden=true;return;}
+        const pc=new RTCPeerConnection();state.pc=pc;pc.addTransceiver('video',{direction:'recvonly'});pc.ontrack=e=>{if(generation!==state.cameraGeneration)return;$('cameraVideo').srcObject=e.streams[0]||new MediaStream([e.track]);$('cameraVideo').hidden=false;$('cameraEmpty').hidden=true;};
+        await pc.setLocalDescription(await pc.createOffer());await new Promise(resolve=>{if(pc.iceGatheringState==='complete'){resolve();return;}const timer=setTimeout(done,2000);function done(){clearTimeout(timer);pc.removeEventListener('icegatheringstatechange',changed);resolve();}function changed(){if(pc.iceGatheringState==='complete')done();}pc.addEventListener('icegatheringstatechange',changed);});if(generation!==state.cameraGeneration)return;
+        state.cameraAbort=new AbortController();const response=await fetch(config.url,{method:'POST',headers:{'Content-Type':'application/sdp'},body:pc.localDescription.sdp,signal:state.cameraAbort.signal});if(!response.ok)throw Error('HTTP '+response.status);const answer=await response.text();if(generation!==state.cameraGeneration)return;await pc.setRemoteDescription({type:'answer',sdp:answer});
+      }catch(error){if(generation!==state.cameraGeneration)return;stopCamera();$('cameraEmptyMessage').textContent='Falha ao abrir o vídeo. Verifique a configuração.';localEvent('Falha na câmera: '+error.message,'error');}
+    }
+    $('cameraImage').addEventListener('load',()=>{$('cameraEmpty').hidden=true;});$('cameraImage').addEventListener('error',()=>{$('cameraImage').hidden=true;$('cameraEmpty').hidden=false;$('cameraEmptyMessage').textContent='Vídeo indisponível. Verifique a configuração.';localEvent('Stream MJPEG indisponível.','warn');});
+    document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{state.view=b.dataset.view;document.querySelectorAll('[data-view]').forEach(v=>v.setAttribute('aria-pressed',String(v===b)));loadCamera();}));
+    $('cameraSettingsButton').addEventListener('click',()=>{const config=cameraConfig();$('cameraTitle').textContent='Configurar '+(state.view==='rover'?'Visão Rover':'Visão Satélite');$('cameraProtocol').value=config.protocol||'mjpeg';$('cameraUrl').value=config.url||'';showModal('cameraModal');});
+    $('cameraForm').addEventListener('submit',e=>{e.preventDefault();const url=new URL($('cameraUrl').value);if(!['http:','https:'].includes(url.protocol)){localEvent('A URL da câmera deve usar HTTP ou HTTPS.','error');return;}try{localStorage.setItem('roboticrover_camera_'+state.view,JSON.stringify({protocol:$('cameraProtocol').value,url:url.href}));}catch(error){reportError(error);return;}closeModal();loadCamera();});
+    $('disconnectCamera').addEventListener('click',()=>{try{localStorage.removeItem('roboticrover_camera_'+state.view);}catch{}stopCamera();closeModal();});
+    $('telemetryButton').addEventListener('click',()=>{showModal('telemetryModal');renderTelemetry();});$('logFilter').addEventListener('change',renderLog);$('clearLog').addEventListener('click',()=>{state.events=[];state.seen.clear();renderLog();});
+    document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>selectMode(b.dataset.mode)));document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>move(b.dataset.action)));
+    $('controlHelpButton').addEventListener('click',()=>showModal('controlHelpModal'));
+    $('controlTargetButton').addEventListener('click',async()=>{if(!manualAllowed()||controlBusy)return;controlBusy=true;const generation=++controlGeneration;const target=state.target==='rover'?'manipulator':'rover';try{await command({kind:'manual',action:'PARAR',target});if(generation===controlGeneration&&connected()&&state.manualEnabled){state.target=target;localEvent('Controle selecionado: '+(target==='manipulator'?'braço':'pilotagem do Rover'),'info',{control_target:target});}}catch(error){reportError(error);}finally{controlBusy=false;updateControls();}});
+    window.addEventListener('keydown',e=>{if(e.defaultPrevented||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;if(e.key===' '){e.preventDefault();stop(true);return;}if(activeModal)return;const action=({escape:'PARAR',arrowup:'AVANCAR',arrowdown:'RECUAR',arrowleft:'ESQUERDA',arrowright:'DIREITA',w:'AVANCAR',s:'RECUAR',a:'ESQUERDA',d:'DIREITA'})[e.key.toLowerCase()];if(action){e.preventDefault();if(manualAllowed())move(action);}});
+    window.addEventListener('blur',()=>{if(state.mode==='CAPTURA_MANUAL')stop();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.mode==='CAPTURA_MANUAL')stop();});
+    window.addEventListener('beforeunload',()=>{if(state.mode==='CAPTURA_MANUAL')navigator.sendBeacon('/api/rover/command',new Blob([JSON.stringify({kind:'manual',action:'PARAR'})],{type:'application/json'}));});
+    setInterval(()=>{const age=state.lastPacket?Date.now()-state.lastPacket:Infinity;state.fresh=state.online&&age<7000;if(!state.fresh)state.manualEnabled=false;$('connectionAge').textContent=Number.isFinite(age)?'Último pacote há '+(age/1000).toFixed(1)+' s':'Aguardando comunicação';updateControls();},500);
+    updateControls();connect();loadCamera();
+  })();
   </script>
 </body>
 </html>

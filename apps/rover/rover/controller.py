@@ -36,6 +36,9 @@ class Controller:
         self.station_session = None
         self.motion_deadline = None
         self.faulted = False
+        self.manual_authorized = False
+        self.control_target = "rover"
+        self.arm_motion = "PARAR"
         self.cache = OrderedDict()
 
     def log(self, event, message, level="INFO"):
@@ -45,10 +48,27 @@ class Controller:
         previous = self.state
         self.state = state
         self.motion = "PARAR"
+        self.arm_motion = "PARAR"
         self.motion_deadline = None
+        if state in ("AGUARDANDO_PEGA", "CAPTURA_MANUAL"):
+            self.manual_authorized = True
+            if state == "AGUARDANDO_PEGA":
+                self.control_target = "manipulator"
+        elif state != SAFE or reason not in ("operator_stop", "manual_deadline_expired"):
+            self.manual_authorized = False
         self.emit("rover/estado", {"state": state, "previous_state": previous,
-                                  "reason": reason, "motion": self.motion})
+                                  "reason": reason, "motion": self.motion,
+                                  "manual_enabled": self.manual_authorized,
+                                  "control_target": self.control_target,
+                                  "arm_motion": self.arm_motion})
         self.log("state_changed", previous + " -> " + state + ": " + reason)
+
+    def approach_completed(self):
+        """Called by navigation only after confirming the approach has stopped."""
+        if self.state != "APROXIMACAO" or not self.station_alive() or self.faulted:
+            return False
+        self.set_state("AGUARDANDO_PEGA", "approach_completed")
+        return True
 
     def connection_changed(self, online):
         self.connected = online
@@ -61,7 +81,7 @@ class Controller:
                 and self.monotonic() - self.last_heartbeat < self.heartbeat_timeout)
 
     def tick(self):
-        if not self.station_alive() and self.state != SAFE:
+        if not self.station_alive() and (self.state != SAFE or self.manual_authorized):
             self.set_state(SAFE, "station_heartbeat_timeout")
             self.emit("rover/alarme", {"code": "COMMUNICATION_LOST", "severity": "critical",
                                       "message": "Heartbeat da estação ausente; parada simulada"})
@@ -133,6 +153,12 @@ class Controller:
             stop = ((topic == "rover/cmd/manual" and data["action"] == "PARAR") or
                     (topic == "rover/cmd/modo" and data["mode"] == SAFE))
             if stop:
+                takeover = topic == "rover/cmd/manual" and data.get("take_control", False)
+                self.manual_authorized = ((self.manual_authorized or self.state in
+                                           ("CAPTURA_MANUAL", "AGUARDANDO_PEGA") or takeover)
+                                          and self.station_alive() and not self.faulted)
+                if topic == "rover/cmd/manual":
+                    self.control_target = data.get("target", "rover")
                 self.set_state(SAFE, "operator_stop")
             else:
                 if not self.station_alive():
@@ -142,17 +168,33 @@ class Controller:
                     raise ContractError("FAULT_LATCHED")
                 if topic == "rover/cmd/modo":
                     target = data["mode"]
-                    if target != self.state and target not in TRANSITIONS[self.state]:
+                    override = data.get("operator_override", False)
+                    if override and (target != "CAPTURA_MANUAL" or self.state != SAFE
+                                     or not self.manual_authorized):
+                        raise ContractError("MANUAL_OVERRIDE_REQUIRES_STOP")
+                    if not override and target != self.state and target not in TRANSITIONS[self.state]:
                         raise ContractError("TRANSITION_FORBIDDEN")
-                    self.set_state(target, "operator_mode")
+                    self.set_state(target, "operator_manual_override" if override else "operator_mode")
                 else:
                     if self.state != "CAPTURA_MANUAL":
                         raise ContractError("MANUAL_MODE_REQUIRED")
-                    self.motion = data["action"]
+                    target = data.get("target", "rover")
+                    action = data["action"]
+                    if data.get("take_control", False):
+                        raise ContractError("TAKE_CONTROL_REQUIRES_STOP")
+                    allowed = ({"SUBIR", "DESCER", "ESQUERDA", "DIREITA"} if target == "manipulator"
+                               else {"AVANCAR", "RECUAR", "ESQUERDA", "DIREITA"})
+                    if action not in allowed:
+                        raise ContractError("ACTION_TARGET_MISMATCH")
+                    self.control_target = target
+                    self.motion = action if target == "rover" else "PARAR"
+                    self.arm_motion = action if target == "manipulator" else "PARAR"
                     self.motion_deadline = self.monotonic() + data["duration_ms"] / 1000
                     self.emit("rover/estado", {"state": self.state, "previous_state": self.state,
-                                              "reason": "simulated_manual_action", "motion": self.motion})
-                    self.log("simulated_motion", "Ação artificial: " + self.motion)
+                                              "reason": "simulated_manual_action", "motion": self.motion,
+                                              "manual_enabled": True, "control_target": target,
+                                              "arm_motion": self.arm_motion})
+                    self.log("simulated_motion", "Ação artificial: " + target + " / " + action)
             result = self._ack(command_id, topic, True, "ACCEPTED")
         except (ContractError, ValueError, OverflowError) as exc:
             result = self._ack(command_id, topic, False, str(exc)[:240])
@@ -167,4 +209,5 @@ class Controller:
 
     def _ack(self, command_id, topic, accepted, reason):
         return {"command_id": command_id, "topic": topic, "accepted": accepted,
-                "reason": reason, "state": self.state, "duplicate": False}
+                "reason": reason, "state": self.state, "duplicate": False,
+                "control_target": self.control_target}

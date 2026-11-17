@@ -3,7 +3,7 @@
 **Data:** 16/11/2026  
 **Escopo:** código, protocolos, firmware, visão computacional, integração, segurança, testes e implantação. Não é um roadmap de fabricação mecânica/elétrica, embora indique dependências de hardware que bloqueiam o software.  
 **Referência de repositório:** https://github.com/DaniloCB06/RoboticRover/tree/main  
-**Estado da evidência:** análise documental dos arquivos do projeto + relato de auditoria e testes fornecido pelo agente do VS Code. **O conteúdo atual do GitHub não foi obtido diretamente neste ambiente** (tentativas de consulta sem acesso útil); por isso nenhum arquivo, linha de código, teste ou estado do repositório foi independentemente verificado. As tarefas de auditoria do código são explicitamente indicadas.
+**Estado da evidência:** revisão direta do checkout local, do código, contratos, fluxos Node-RED, firmware e testes. Baseline Git atual: `main`, commit `48dc5ea94d90191488d56894603b0b85099f4e74` (remoção dos sensores de distância e inclusão deste roadmap). As alterações posteriores de dashboard, permissões manuais e comunicação estão na árvore de trabalho e ainda não fazem parte desse commit. Foram reproduzidos nesta sessão **135 testes locais aprovados, 9 testes de integração MQTT aprovados e 21 testes isolados da Pi aprovados**, além do teste de interface no Chrome. Os 21 testes da Pi já estão incluídos nos 135, não devem ser somados. A implementação física não foi validada nesta sessão; as fontes acadêmicas citadas abaixo não estão disponíveis neste checkout para conferência independente.
 
 ## 1. Fontes e precedência
 
@@ -11,11 +11,13 @@
 2. `Relatorio_preProjeto_RoboticRover_ATUALIZADO_2026-11-10.md`: revisão explícita de 10/11/2026; **Pi 3 embarcada, YOLO/AprilTags na estação-base**; descrição atual proposta para arquitetura/controle. É a base da análise quando conflita com a versão mais antiga.
 3. `PreProjeto_RegrasDoJogo_Projeto Robótica.pdf`, pp. 2–3: regras do professor: busca e aproximação autônomas, captura manual, transporte manual permitido, bônus por entrada autônoma na área verde com objeto, ferramenta intercambiável somente com robô parado/em espera, arena 2×2 m, zona 50×50 cm, 3 tentativas de 4 min, **5 cores × 6 formatos** (30 possibilidades, não necessariamente presentes ao mesmo tempo).
 4. Material de aula: `controle_velocidade_robos_diferenciais.pptx.pdf`, `Encoders_Controle_velocidade.pptx.pdf`, `MOTORES_DC_PWM_PONTE_H.pptx.pdf`, `cinematica_e_joystick.pptx.pdf`, `Manipuladores_roboticos.pdf`, `AprilTag_OpenCV_pupil_apriltags_4_slides.pdf`, `Navegação de robôs por visão computacional - AprilTag.pdf` e `yolo.pdf`.
-5. Diagnóstico do agente VS Code reproduzido na conversa: única evidência disponível sobre **o que está implementado no código**. Registros de `125 passed`, `8 skipped`, e `19 passed` para a Pi são **resultados relatados**, não reproduzidos nesta auditoria.
+5. Checkout local e testes executados nesta sessão: fonte primária para **o que está implementado no código**. Os resultados antigos `125 passed`, `8 skipped` e `19 passed` foram substituídos pelos resultados atuais registrados na seção 2.1. As descrições dos documentos acadêmicos nos itens 1–4 são referências históricas, não arquivos conferidos nesta revisão.
 
 ### Decisões já orientadas pelo projeto
 
 - **Atualização de escopo:** não haverá sensores dedicados de distância/proximidade ou movimento/IMU. Removidos da telemetria, simuladores e dashboard; mantidos bateria, temperatura, encoders, feedback de servos e estimativa de distância por visão.
+
+- **Autorização manual definida pelo operador:** ao concluir aproximação, o Rover informa `AGUARDANDO_PEGA` e `manual_enabled: true`, inicialmente para o braço. Espaço é a exceção de parada forçada e tomada de controle, confirmada pelo controlador. Clicar em MANUAL ou enviar parada comum não cria autorização inicial. BUSCA devolve o controle ao automático. No automático, todos os botões do direcional, inclusive parar, ficam apagados/desabilitados; WASD, setas e Esc não enviam comandos manuais. O popup ⓘ explica os controles e o alternador Rover/braço identifica o destino na comunicação. Essas regras estão implementadas em software; não comprovam parada ou atuação física.
 
 - **Pi 3**: recebe vídeo USB, transmite stream, mantém a FSM e supervisão de segurança, recebe observações MQTT, controla o Mega via serial, publica telemetria.
 - **Estação-base**: Mosquitto/Node-RED/dashboard, processamento de vídeo YOLO26n + AprilTags/estimativa de distância, filtra observações, publica-as para Pi, envia resultados ao servidor do professor quando contrato disponibilizado.
@@ -24,31 +26,49 @@
 
 **Conflitos a resolver nos documentos antes de congelar interfaces:** Pi 5 versus Pi 3; visão embarcada versus estação; 4 versus 5 cores; descrição antiga das ferramentas (gancho e V) versus proposta atual de garra de dupla apreensão/caçamba; atuação AX-12A via Mega diretamente versus Mega→ArbotiX (uso experimental informado pelo agente). Não transformar decisões experimentais em requisitos definitivos.
 
-## 2. Estado do software: comparação requisito × relato do agente
+## 2. Estado do software: comparação requisito × implementação verificada
 
-| Frente | O que o projeto exige | O que o agente relata | Diagnóstico atual | Próximo resultado verificável |
+| Frente | O que o projeto exige | Implementação/evidência local | Diagnóstico atual | Próximo resultado verificável |
 |---|---|---|---|---|
-| Estação-base/MQTT | Comandos e telemetria ponta a ponta, sem confundir simulação com robô | Docker/nativo + Mosquitto + Node-RED implementados | **Base aparentemente feita; integração real não demonstrada** | E2E com broker e Pi real |
-| Dashboard | Vídeo, controle condicionado ao estado, ACK real, alarmes e operação manual | Interface, logs, comandos, WebSocket/API, vídeo placeholder/simulado | **Interface avançada, operação física incompleta** | Comandos e feedback reais, vídeo real, bloqueios de modo |
-| Simulador Python | Simular FSM, erros, MQTT e falhas | FSM, watchdog, TTL, UUID, LWT, deduplicação, testes | **Relatado como bem desenvolvido** | Contrato unificado com cliente real; regressão |
-| Cliente Raspberry Pi 3 | Supervisão da missão + webcam + MQTT + USB Mega | MQTT básico, FSM divergente, sem serial/atuação | **Parcial** | Serviço único com ponte serial, vídeo e FSM canônica |
-| Protocolo MQTT | Mesmo contrato para real/simulado; observações visuais datadas | Schema só permite `simulated: true`; estados divergentes | **Incompatível com arquitetura atual** | Schemas versionados e testes cruzados |
+| Estação-base/MQTT | Comandos e telemetria ponta a ponta, sem confundir simulação com robô | Mosquitto/Node-RED nativos: 9 testes MQTT reais aprovados, incluindo HTTP/WS, ACK correlacionado, tomada manual e destino braço/rodas | **Integração local com simulador feita; Pi física pendente** | E2E com Pi e hardware reais |
+| Dashboard | Vídeo, controle condicionado ao estado, ACK real, alarmes e operação manual | Layout responsivo; modos no topo; Rover/Satélite; bloqueio total do direcional/teclado; alternador de destino; log único com detalhes; gráficos em popup; QA Chrome aprovado | **Interface e intertravamentos de software entregues; atuação física pendente** | Vídeo e feedback físicos; intertravamento validado no robô |
+| Simulador Python | Simular FSM, erros, MQTT e falhas | FSM, watchdog, TTL, UUID, LWT, deduplicação, autorização manual e ações de braço separadas da tração, com testes | **Implementação simulada verificada** | Contrato unificado com cliente real; integração serial |
+| Cliente Raspberry Pi 3 | Supervisão da missão + webcam + MQTT + USB Mega | MQTT, autorização manual, `approach_completed()`, destino braço/rodas e 21 testes isolados; ainda sem serial/atuação | **Parcial; duas FSMs continuam existindo** | Serviço único com ponte serial, vídeo e FSM canônica |
+| Protocolo MQTT | Mesmo contrato para real/simulado; observações visuais datadas | Schema v1 ampliado com `manual_enabled`, `target`, `control_target`, `take_control` e `arm_motion`; schema central ainda exige `simulated: true`, enquanto a Pi usa validador próprio | **Permissões/destinos integrados; unificação e observações pendentes** | Schemas versionados e testes cruzados completos |
 | Protocolo Pi↔Mega | Comando/telemetria/ACK/timeout/integridade | **Ausente** | **Bloqueio crítico** | Protocolo especificado, codificado e exercitado em loopback |
 | Arduino Mega | Ponte H, encoder/PID, sensores, proteção, servos | Repassador serial transparente | **Bloqueio crítico de segurança** | Firmware controlador com watchdog, estados e hardware em bancada |
 | Servos AX-12A/ArbotiX | Posição, velocidade, limites e feedback reais | PING/GET/SET experimental; testes físicos 1 e 4 relatados | **Experimental** | Testes de todas as juntas com falhas/limites |
 | Motores NXT | PWM/direção + realimentação se encoder validado | Ausentes do firmware funcional relatado | **Ausente** | Rodas giram/param com limites; encoder e controle de velocidade |
-| Sensores reais | Bateria INA226, sensores escolhidos, alertas | Telemetria artificial; real não demonstrada | **Não comprovado** | Drivers/leituras medidas em bancada e publicadas |
-| Vídeo da webcam | Pi→estação com atraso controlado | Apenas UI preparada | **Ausente** | Stream real + reconexão, medição de idade/latência |
+| Sensores reais | Bateria/temperatura e alertas; sem sensores dedicados de distância/movimento | `proximity_cm`, radar e leituras frontais removidos, inclusive backup/ZIP; bateria/temperatura ainda artificiais | **Remoção concluída; leitura real pendente** | Drivers/leituras medidas em bancada e publicadas |
+| Vídeo da webcam | Pi→estação com atraso controlado | Players MJPEG/WHEP/iframe e URLs independentes Rover/Satélite; sem vídeo artificial ou stream físico validado | **Receptor web pronto; captura/stream na Pi ausentes** | Stream real + reconexão, medição de idade/latência |
 | YOLO na estação | Detectar 6 geometrias, 5 cores na arena real | `vision/README.md` placeholder | **Código não evidenciado** | Serviço de inferência com pesos versionados/testados |
 | AprilTags/distância | Estimar distância **à peça** ou invalidar medida | Não evidenciado | **Ausente** | Calibração e avaliação de erro real; associação tag↔peça |
 | Navegação autônoma | Busca, seleção, alinhamento, aproximação e parada antes da peça | Ausente do robô físico | **Ausente** | Missão autônoma repetível em arena de teste |
-| Captura manual | Exigir autorização, impedir avanço na captura, controlar braço | Botões/UI relatados; controle real ausente | **Ausente ponta a ponta** | Operador captura sem movimentos autônomos concomitantes |
-| Retorno/depósito | Retorno manual funcional; autônomo opcional para bônus; depósito seguro | Pi tem estados; demais componentes divergentes | **Conceito parcial** | Ciclo de resgate manual completo; bônus em fase avançada |
+| Captura manual | Autorizar após aproximação ou parada forçada; separar braço de tração | `manual_enabled` controlado no Rover; UI bloqueada no automático; alvo `manipulator` usa ações próprias e mantém `motion: PARAR`, comprovado em testes | **Fluxo de software parcial; sem juntas, garra ou captura real** | Operador captura com limites e feedback físicos |
+| Retorno/depósito | Pilotar até área segura após captura; depósito seguro; retorno autônomo opcional | Alternador permite selecionar tração durante sessão manual autorizada; estados finais, confirmação de peça e soltura ainda incompletos | **Pilotagem simulada disponível; missão física pendente** | Ciclo de resgate manual completo; bônus em fase avançada |
 | Servidor professor | Publicar imagens/resultados por interface futura | Não mencionado entre implementações | **Pendente contrato externo** | Adaptador com mocks; integração oficial quando requisitos recebidos |
 | Deploy/segurança | Reinício, autenticação, ACL, limites e logs | Dev local; TLS/systemd faltantes | **Parcial** | Execução reprodutível e watchdog independente |
-| Testes | Unidade + integração + HIL + arena | `125 passed`, `8 skipped`, `19 passed`, não reproduzidos | **Automatizados promissores, sem evidência HIL completa** | CI, broker real, compilação firmware, injeção de falhas |
+| Testes | Unidade + integração + HIL + arena | 135 locais, 9 MQTT reais, 21 Pi (subconjunto dos locais), QA Chrome desktop/mobile | **Suítes locais reproduzidas; HIL/arena ausentes** | CI, compilação firmware e injeção de falhas físicas |
 
 **Importante:** um `SET` de servo em firmware experimental não significa que o dashboard já controla o braço. Um ACK de recebimento MQTT não significa movimento executado. Um estado na FSM da Pi não significa que a missão esteja operacional.
+
+### 2.1. Registro de verificação local e rastreabilidade
+
+Ambiente utilizado: macOS/Darwin 21.6.0 x64, Python da `.venv` **3.12.3**, Node.js **22.14.0**, Node-RED **4.1.10**, Mosquitto **2.0.22** e Chrome **150.0.7871.125**. A integração foi executada **sem Docker**, com broker temporário em `18883` e Node-RED em `18880`, usando cópia do fluxo com endereço/client ID isolados. O fluxo do projeto envia heartbeat a cada **1 s**, compatível com timeout local de **4 s**.
+
+Inventário das frentes revisadas: `apps/rover/rover` (simulador), `apps/rover/roboticrover_pi3` (cliente Pi), `apps/station/node-red` (dashboard/fluxos), `shared/contracts` (contratos), `infra/mqtt` (broker), `firmware/arduino-mega`, `firmware/arbotix-board`, `vision`, `tests`, `apps/rover/tests` e `docs`. O ZIP e `.flows.json.backup` são snapshots históricos, não a fonte da dashboard e das regras manuais atuais.
+
+| Entrega verificada | Implementação | Evidência / limite |
+|---|---|---|
+| Contratos, FSM, watchdog e autorização | `apps/rover/rover/`, `shared/contracts/v1/messages.schema.json` | `python -m pytest -q`: **135 passed, 9 skipped**; os 9 exigem infraestrutura e foram executados separadamente |
+| Comunicação real com simulador | `tests/test_mqtt_integration.py`, `apps/station/node-red/flows.json` | `RUN_MQTT_INTEGRATION=1 MQTT_PORT=18883 NODE_RED_URL=http://127.0.0.1:18880 .venv/bin/python -m pytest -q -p no:cacheprovider -m integration`: **9 passed**; não utiliza Pi/Mega físicos |
+| Cliente de preparação Pi | `apps/rover/roboticrover_pi3/`, `apps/rover/tests/` | Em `apps/rover`: `../../.venv/bin/python -m unittest discover -s tests -q`: **21 OK**, reproduzidos nesta revisão; teste roda no Mac |
+| Bloqueio visual, cliques/teclado e popups | `apps/station/node-red/dashboard.html`, `tests/dashboard_browser.cjs` | `node tests/dashboard_browser.cjs`, com Chrome temporário na porta de depuração `19222`: aprovado em desktop/mobile; transporte simulado nesse teste de UI |
+| Template HTML sincronizado | `apps/station/node-red/sync-dashboard.js` | Teste `test_dashboard_nodes_and_html_sync` garante igualdade com o HTML embutido em `flows.json` |
+| Remoção dos sensores de distância | Simuladores, schema, HTML, `flows.json`, backup, ZIP e documentação | Commit `48dc5ea`; `test_telemetry_rejects_removed_distance_sensor` rejeita o campo antigo |
+| Comunicação Mega/ArbotiX | `firmware/arduino-mega/`, `firmware/arbotix-board/` | Código lido; ensaios físicos relatados na documentação não foram reproduzidos; sem toolchain Arduino/PlatformIO disponível |
+
+As fontes acadêmicas citadas na seção 1 não estão no checkout. A auditoria do software não confirma independentemente regras de competição, modelo de hardware, pesos YOLO ou autorização para uso de AprilTags.
 
 ## 3. Arquitetura-alvo de software
 
@@ -61,7 +81,7 @@ flowchart TB
   F <-->|USB serial: comando / ACK / telemetria| MEGA[Mega: watchdog + controle local]
   MEGA --> DRV[Ponte H / NXT + encoders]
   MEGA --> SERVO[AX-12A via interface a definir]
-  MEGA --> SENS[Sensores de potência e opcionais]
+  MEGA --> SENS[Bateria e temperatura: sem sensores dedicados de distância/movimento]
   B --> DASH[Dashboard do operador]
   V -->|upload assíncrono, contrato pendente| PROF[Servidor do professor]
 ```
@@ -82,17 +102,23 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 ## 4. Roadmap em ordem executável
 
 **Legenda de status:**
+
 - `[x]` concluído e reproduzido;
 - `[-]` parcialmente concluído;
 - `[ ]` não iniciado;
 - `[!]` bloqueado por hardware ou dependência externa.
 
+Um subitem `[x]` de software/simulação não conclui o marco físico que o contém. Os marcos mantêm seus critérios de aceite completos; itens desmembrados abaixo deixam explícito o que já foi entregue.
+
 ### P0 — Fechar escopo e impedir comando inseguro (bloqueante, antes de teste com rodas no chão)
 
 **[-] R0. Auditoria de código reproduzível**
-- [-] Fazer checkout do commit `main` e registrar SHA/árvore de diretórios, versões de Python/Node-RED/Arduino e dependências.
-- [-] Reexecutar suíte completa, contabilizando `skipped`; rodar integração MQTT com broker real; compilar firmware Mega e ArbotiX.
+- [x] Inspecionar a `main` local, registrar SHA, inventário das pastas, versões de Python/Node/Node-RED/Mosquitto e configuração de dependências; distinguir alterações ainda não commitadas (seção 2.1).
+- [x] Executar suíte local e suíte isolada da Pi no Mac; registrar **135 aprovados / 9 ignorados** e **21 OK**, respectivamente.
+- [x] Executar integração com broker/Node-RED reais e simulador, sem Docker: **9 aprovados**, incluindo controle manual e destino braço/rodas.
+- [!] Configurar toolchains/placas e compilar os firmwares Mega e ArbotiX; registrar versões Arduino e bibliotecas utilizadas.
 - [-] Mapear cada função relatada a arquivo, classe, testes e evidência; identificar código morto/duplicado e documentação antiga/ZIP histórico.
+- [x] Identificar a sobreposição dos clientes `rover`/`roboticrover_pi3` e o ZIP/backup históricos; registrar a matriz de evidências local. A auditoria das fontes acadêmicas e a cobertura de firmware permanecem pendentes.
 - **Aceite:** matriz requisito → implementação → teste → status, sem chamar relato de prova independente.
 
 **[-] R1. Contratos e FSM canônicos**
@@ -100,7 +126,11 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 - [-] Definir **transições autorizadas**: aproximação→parada física→aguarda liberação→captura; proibir comandos de tração autônomos durante captura; troca de ferramenta somente ESPERA + tração parada; confirmar peça segura antes de retorno; impedir movimento automático fora das condições permitidas.
 - [-] Resolver sobreposição `rover` versus `roboticrover_pi3`: preferir módulo compartilhado de contratos/segurança/FSM e adaptadores `SimulatedHardware`/`SerialHardware`, em vez de duas lógicas independentes. A escolha exige primeiro examinar código existente.
 - [-] Versionar contratos com suporte explícito `simulated: true/false`, estados reais, limites uniformes de payload, origem/ACL, tempo de validade, anti-replay e tratamento de chaves JSON duplicadas; manter compatibilidade ou migração coordenada Node-RED/dashboard/Pi/simulador.
-- [-] Diferenciar visualização de status **comprovado** de eventos visuais inferidos.
+- [x] Diferenciar na dashboard disponibilidade do cliente, origem simulada e ausência de confirmação física; retirar vídeo sintético e atualizar estado pelos pacotes recebidos, não pelo botão clicado.
+- [x] Publicar `manual_enabled` no estado e validar autorização nos dois clientes; espera inicial, busca, aproximação, falhas e perda de heartbeat não liberam o operador.
+- [x] Implementar a exceção explícita de Espaço: `PARAR` com `take_control: true`, seguida de entrada manual somente após confirmação/autorização. Parada comum ou clicar em MANUAL não concede autorização inicial.
+- [x] Separar `target: rover/manipulator`, ações permitidas por destino e `control_target` nos ACKs/estados; no simulador, ações de braço usam `arm_motion` e mantêm a tração em `PARAR`.
+- [x] Remover `proximity_cm`, radar e dados de distância dedicados dos contratos, clientes, dashboard e artefatos históricos; manter bateria/temperatura e rejeitar o campo antigo no schema.
 - **Aceite:** testes de transição, contrato cruzado, mensagens vencidas/retained/duplicadas e permissões de modo para real e simulado.
 
 **[ ] R2. Protocolo USB serial Pi↔Mega**
@@ -141,6 +171,13 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 - [-] Controle manual de tração somente nos modos autorizados (transporte com carga, zona de resgate e situações especificamente permitidas), não usar teleop como substituto de busca/aproximação exigidas pela regra.
 - [-] Comandos `hold-to-run`/dead-man com TTL, limites de velocidade e STOP ao liberar/fechar página/perder conexão; habilitação visível do modo atual.
 - [-] Substituir valores simulados de bateria/temperatura por mensagens reais ou assinalar explicitamente ausência de sensor/valor simulado.
+- [x] Reorganizar a dashboard: navbar simples, link Node-RED, barra horizontal ESPERA/BUSCA/APROXIMAÇÃO/MANUAL, vídeo à esquerda e controle à direita com estado/último ACK abaixo; validar layout desktop/mobile.
+- [x] Apagar e desabilitar todos os botões do direcional, inclusive parar, e bloquear WASD/setas/Esc no automático; manter Espaço como parada forçada independente da liberação manual. Comprovar ausência de envio nos testes de navegador.
+- [x] Liberar o direcional somente com `manual_enabled: true` e estado autorizado; bloquear por desconexão e revogar autorização ao retornar a BUSCA ou ocorrer falha.
+- [x] Adicionar alternador Pilotar Rover/Controlar braço no canto superior direito, parar antes da troca e identificar o destino na mensagem; disponibilizar cliques, WASD e setas, com instruções em popup ⓘ no canto superior esquerdo.
+- [x] Unificar estados, ACKs, conexões, avisos e erros em log com cores, filtros e popup de detalhes; conservar até 200 eventos em memória no Node-RED.
+- [x] Mover gráficos de bateria/temperatura para popup sob demanda, com indicação de dados simulados e sem leituras de proximidade.
+- [ ] Validar limites de velocidade e parada no hardware; completar dead-man/hold-to-run e intertravamentos físicos. Os comandos atuais são pulsos simulados de 500 ms, não controle físico contínuo.
 - **Aceite:** interface respeita travas e interrupção; mensagens de movimento não sobrevivem à perda do operador.
 
 ### P2 — Braço, câmera e percepção real
@@ -150,6 +187,7 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 - [-] Reutilizar PING/GET/SET existentes como ensaios; testar escrita real, posições de todas as juntas, velocidade, tensão, temperatura, carga reportada e erros do protocolo Dynamixel 1.0.
 - [!] Calibrar zero, limites angulares individuais e posição segura, movimentos suaves/jog; distinguir posição desejada e leitura efetiva, sem usar só ACK para presumir conclusão.
 - [ ] Implementar comando manual independente por junta; cartesiano + cinemática inversa **somente depois**, caso a geometria/tempo permitam. Validar troca de ferramenta, homing seguro e travamento da tração na captura.
+- [x] Entregar interface e contrato de comandos genéricos do braço (`SUBIR`, `DESCER`, `ESQUERDA`, `DIREITA`, `PARAR`) separados das rodas e exercitados por testes Python/MQTT/browser. Não inclui juntas, garra, cinemática ou atuação física.
 - **Aceite:** operador executa captura e soltura, com limites ativos, sem colisão e com telemetria de juntas.
 
 **[-] R8. Streaming da webcam Pi→estação**
@@ -157,6 +195,7 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 - [-] Implementar canal separado do MQTT para MJPEG ou WebRTC; decidir por teste de latência e facilidade, com autenticação/rede adequada.
 - [ ] Incluir `frame_id`, timestamp no instante da captura e associação consistente entre frames e observações, mesmo com buffers e perdas.
 - [-] Exibir vídeo na dashboard; medir atraso de captura→exibição e captura→observação→Pi. Descartar frames antigos em vez de processar fila longa.
+- [x] Implementar seleção Visão Rover/Visão Satélite, configuração independente por câmera em popup e persistência das URLs no navegador, com players MJPEG/WHEP/iframe. Validar interação da interface, sem alegar recepção de stream físico.
 - [ ] Pausar movimento autônomo quando stream/percepção estiverem indisponíveis ou vencidos; teleop também deve respeitar visibilidade segura.
 - **Aceite:** streaming estável na Pi 3 real, reconecta e não autoriza movimento baseado em imagem antiga.
 
@@ -171,18 +210,20 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 
 ### P3 — Missão autônoma completa
 
-**[ ] R10. Navegação de busca, alvo e aproximação**
+**[-] R10. Navegação de busca, alvo e aproximação**
 - [-] Implementar a sequência BUSCA→ALVO_IDENTIFICADO→APROXIMAÇÃO→PARADA→AGUARDANDO_LIBERACAO_MANUAL na FSM da Pi, não deixar evento YOLO liberar braço diretamente.
 - [ ] Selecionar alvos conforme classe/ferramenta, visibilidade, distância e viabilidade; estratégia de pontuação por **pontos/minuto medidos**, sem probabilidades inventadas.
 - [ ] Busca com movimento lento e limitado, reavaliando cada frame novo; rotação/alinhamento por erro horizontal e avanço em pequenos trechos com estimativa válida.
 - [ ] Usar feedback das rodas (quando validado); tolerar perda de alvo/oclusão com parada, não avançar sem observação recente; preservar margens para parede, peça e manipulador.
-- [ ] Exigir confirmação de parada do Mega antes de `AGUARDANDO_LIBERACAO_MANUAL`; liberar captura somente após ação explícita do operador.
+- [-] Integrar confirmação de chegada/parada física do Mega ao evento de fim da aproximação que libera captura. `approach_completed()` e autorização de software já existem; falta a navegação real fornecer a confirmação, sem presumir chegada por tempo ou pela interface.
+- [x] Criar `approach_completed()` nos dois controladores, condicionado ao estado APROXIMACAO e heartbeat válido; no simulador também exige ausência de falha. O evento entra em AGUARDANDO_PEGA e disponibiliza o braço em software, sem disparar movimento automático do manipulador.
 - [ ] Evitar empurrar/colidir com peças; testar prevenção de colisões por visão, sem sensores dedicados de distância/movimento.
 - **Aceite:** busca e aproximação autônomas repetíveis, parada sem contato, captura liberada só com robô imóvel.
 
-**[ ] R11. Fluxo de captura, retorno e depósito**
+**[-] R11. Fluxo de captura, retorno e depósito**
 - [ ] Comandar garra/caçamba em `CAPTURA_MANUAL`, exigir declaração ou sensor confiável de peça presa; não presumir pelo botão de fechamento.
 - [-] Permitir `RETORNO_MANUAL` conforme regras, com câmera/controles seguros; determinar condição de entrada na zona e `DEPOSITO`, soltar sem empurrar objetos.
+- [x] Disponibilizar a alternância braço→pilotagem→braço em uma sessão manual autorizada, com parada na troca e separação de destinos comprovada nos testes. A coleta, o transporte até a área segura e a soltura continuam pendentes no hardware.
 - [ ] Registrar início/fim de ciclo e falhas de captura, troca de ferramenta somente parado/ESPERA; cronômetro de 4 min na interface é assistivo e não substitui cronômetro oficial.
 - [ ] Implementar `RETORNO_AUTONOMO` **após ciclo manual funcional**, com localização da área verde, orientação/odometria e confirmação de entrada segura; retorno autônomo não autoriza captura automática.
 - [ ] Avaliar pontos por minuto observados; distinguir bônus 2× só quando condição oficial foi cumprida (não apenas toggle UI).
@@ -200,14 +241,19 @@ Não assumir que os tópicos exemplificativos do relatório (`rover/visao/detecc
 - [ ] Serviços `systemd` para Pi (serial, MQTT, vídeo, FSM) com healthcheck e reinício seguro; documentação de bootstrap de Pi 3 e acesso webcam/serial.
 - [-] Mosquitto com credenciais/ACL, proteção do Node-RED/API, TLS quando exigido/viável no cenário da rede, segregação de comandos e observações, sem segredos no Git.
 - [-] Métricas e logs correlacionados por `command_id`, `frame_id`, boot/session ID, timestamps, latência de rede/visão, falhas e estados; diferenciar status de cada enlace.
-- [-] CI: lint, testes e validação de schemas, teste integração MQTT com serviços e compilação dos firmwares (targets/placas corretamente configurados).
+- [ ] Configurar CI para lint, testes, schemas, integração MQTT e compilação dos firmwares. As suítes locais existem, mas não há pipeline CI configurado.
 - [-] Fixar dependências, configuração por ambiente, exemplos sem senhas e guias de operação, recuperação de falhas e atualização.
+- [x] Documentar operação nativa no Mac sem Docker e atualizar README/roteiro/protocolo com permissões, destinos e novos controles da dashboard.
+- [x] Disponibilizar `sync-dashboard.js` para sincronizar o HTML com o template Node-RED e verificar essa igualdade em teste automatizado.
 - **Aceite:** ligar Pi/estação na configuração documentada, ver serviços saudáveis, detectar falhas e desligar seguro.
 
 **[-] R14. Campanha de testes de integração e competição**
 - [-] Unitários: FSM, validação de schema, geometria, odometria, filtros e prioridade de comando.
 - [-] Integração: simulador↔broker↔Node-RED; Pi↔Mega real; AX-12A; vídeo↔visão; ACKs; schemas real/simulado.
 - [-] Fault injection: Wi-Fi/broker offline, serial removida, Mega reset, imagem congelada, inferência atrasada, ruído CRC, peça desaparece, servo ausente, bateria baixa, browser fecha, comando duplicado/retained.
+- [x] Reproduzir os testes Python atuais de contratos/FSM/watchdog/autorização/destino: **135 aprovados**, incluindo rejeição de ação incompatível e separação braço/tração.
+- [x] Reproduzir os **9 testes MQTT locais** com Mosquitto/Node-RED nativos, incluindo ACK correlacionado por UUID, rejeições, LWT, reconexão e tomada de controle/destino do manipulador.
+- [x] Adicionar e executar `tests/dashboard_browser.cjs` no Chrome: bloqueio total durante automático, WASD/setas/cliques, conclusão da aproximação simulada, Espaço, alternador, popups, desconexão e responsividade. O transporte é simulado nesse teste; a comunicação real é coberta pela suíte MQTT separada.
 - [!] HIL em bancada, depois rodagem em arena, com limitação de velocidade e registro de distância de parada, taxa de sucesso, latências, FPS e pontuação efetiva por ciclo.
 - [!] Executar repetidamente ciclo completo dentro dos 4 minutos, incluindo troca de ferramenta se usada; documentar vídeos/logs e ações de recuperação.
 - **Aceite:** registro mensurável de segurança, repetibilidade e resgate completo; sem falhas críticas abertas.
@@ -249,7 +295,7 @@ flowchart LR
 - [ ] YOLO na estação e estimativa de aproximação validada/limitada; dados datados.
 - [ ] Busca e aproximação autônomas, parada física confirmada.
 - [ ] Captura manual do braço + retorno **manual** + depósito funcional.
-- [ ] Modo ESPERA e troca de ferramenta seguros; alarme e recuperação de falhas.
+- [-] Modo ESPERA, alarmes e revogação manual implementados em software; faltam troca de ferramenta, parada física comprovada e recuperação de falhas no robô.
 - [!] Integração servidor professor se for exigência e contrato for disponibilizado a tempo (não omitir sem acordo com o professor).
 
 ### Avançado (após MVP estável)
@@ -265,14 +311,14 @@ flowchart LR
 | Variante Pi 3 e SO | Pendente | Identificar placa, câmera, `/dev/serial*`, Wi-Fi e desempenho real |
 | Arquitetura Mega↔ArbotiX↔AX-12A | Há firmware experimental, mas relatório cita Mega↔AX-12A | Escolher **um** controlador do barramento e protocolo final |
 | Ponte H/motores e encoders | NXT e L298N/DRV8871 candidatos | Teste de pinagem/corrente, PWM e CPR antes dos drivers finais |
-| Unificação de FSM e cliente Pi | Duas implementações divergentes, conforme agente | Revisão de código e decisão sobre biblioteca compartilhada |
-| Tópicos/schemas MQTT | Proposta documental ≠ contrato implementado confirmado | Documento v2 + testes de migração |
-| Taxas de mensagens e timeouts | Não congeladas | Medir latência de Wi-Fi, vídeo, loop serial e distância de parada |
-| Streaming | MJPEG/WebRTC em aberto | Escolha baseada em Pi 3 real e atraso até estação |
+| Unificação de FSM e cliente Pi | Duas implementações inspecionadas; permissões/destinos manuais alinhados, mas sem biblioteca única | Extrair contratos/FSM compartilhados e migrar testes dos dois clientes |
+| Tópicos/schemas MQTT | Extensão v1 manual implementada e testada; incompatibilidades real/simulado e estados finais permanecem | Documento v2 + testes de migração; incluir observações visuais |
+| Taxas de mensagens e timeouts | Heartbeat 1 s, timeout local 4 s, pulso manual da UI 500 ms verificados no Mac; parâmetros físicos não congelados | Medir latência de Wi-Fi, vídeo, loop serial e distância de parada no robô |
+| Streaming | Players MJPEG/WHEP/iframe e seleção Rover/Satélite implementados; fonte satélite e serviço de captura ainda não definidos | Escolher transporte com Pi 3 real, fonte satélite disponível e atraso medido |
 | Família/tamanho/posição AprilTags | Em aberto; imagem fornecida não prova uso autorizado | Calibração e autorização; definir transformação tag↔peça |
 | Ferramentas e juntas | Proposta atual difere da especificação antiga | Geometria/limites e comando efetivamente montados |
 | Protocolo do servidor do professor | Não fornecido | Integração mock agora; implementação real após contrato |
-| Estado oficial de captura/retorno | Exige implementação cruzada | Tabela de eventos e transições assinada pela equipe |
+| Estado oficial de captura/retorno | Regra de autorização manual definida pelo operador e implementada em software; fase de resgate/depósito física e FSM completa pendentes | Integrar conclusão da aproximação ao Mega e fechar transições de coleta, transporte, depósito e troca de ferramenta |
 
 ## 8. Primeira sequência de issues / PRs recomendada
 
@@ -308,12 +354,13 @@ Em cada PR: escopo restrito, testes automatizados, atualização de contratos/do
 
 ## 10. Conclusão
 
-O código descrito pelo agente **não é um projeto finalizado**: ele representa sobretudo a **plataforma de desenvolvimento, simulação, estação-base e ensaios de firmware**. O maior risco não é ausência de telas, mas a falta de um caminho controlado e verificável entre observação e atuação física. O caminho crítico é **R1→R2→R3→R4/R5→R6**, em paralelo a **R8→R9** e **R7**, convergindo em **R10→R11→R14**. Primeiro viabilizar um resgate completo **com retorno manual**, que já é permitido, antes de tentar a bonificação de retorno autônomo.
+O checkout revisado já entrega a **estação-base, simulação, dashboard responsiva, autorização manual, separação braço/rodas e testes locais/MQTT/browser**. Essas entregas estão marcadas individualmente como concluídas; nenhum marco R0–R14 atingiu ainda todo o seu aceite. A integração serial, a segurança local do Mega, tração/encoders, visão, streaming físico, captura/soltura e validação em arena permanecem pendentes. O caminho crítico continua **R1→R2→R3→R4/R5→R6**, em paralelo a **R8→R9** e **R7**, convergindo em **R10→R11→R14**. A primeira missão física deve completar busca/aproximação, captura manual, retorno manual e depósito antes do retorno autônomo.
 
 ### Referências de revisão local
+
 - `Espec_projeto_RR.docx.md`, itens 1–7.
 - `Relatorio_preProjeto_RoboticRover_ATUALIZADO_2026-11-10.md`, seções 2.1–2.3, 3.1–3.3, 4.4, 5.1–5.4, 6.1–6.4.
 - `PreProjeto_RegrasDoJogo_Projeto Robótica.pdf`, pp. 2–3.
 - `controle_velocidade_robos_diferenciais.pptx.pdf`, aula sobre controle diferencial, realimentação e encoders, e `Encoders_Controle_velocidade.pptx.pdf`.
 - `cinematica_e_joystick.pptx.pdf`, aula sobre controle jog/IK, e `AprilTag_OpenCV_pupil_apriltags_4_slides.pdf`, calibração/pose.
-- Relatório textual do agente VS Code **colado pelo usuário** nesta conversa (não verificado por checkout).
+- Checkout local e resultados reproduzidos nesta sessão, registrados na seção 2.1; os documentos acadêmicos listados acima continuam indisponíveis neste checkout para revisão independente.

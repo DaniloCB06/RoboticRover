@@ -85,6 +85,15 @@
                 "ESQUERDA",
                 "DIREITA"
               ]
+            },
+            "manual_enabled": {
+              "type": "boolean"
+            },
+            "control_target": {
+              "enum": ["rover", "manipulator"]
+            },
+            "arm_motion": {
+              "enum": ["PARAR", "SUBIR", "DESCER", "ESQUERDA", "DIREITA"]
             }
           },
           "required": [
@@ -242,6 +251,10 @@
                 "CAPTURA_MANUAL",
                 "SEGURO_ESPERA"
               ]
+            },
+            "operator_override": {
+              "type": "boolean",
+              "description": "Tomada explícita de controle manual após parada confirmada."
             }
           },
           "required": [
@@ -275,8 +288,16 @@
                 "AVANCAR",
                 "RECUAR",
                 "ESQUERDA",
-                "DIREITA"
+                "DIREITA",
+                "SUBIR",
+                "DESCER"
               ]
+            },
+            "target": {
+              "enum": ["rover", "manipulator"]
+            },
+            "take_control": {
+              "type": "boolean"
             },
             "duration_ms": {
               "type": "integer",
@@ -338,6 +359,9 @@
             },
             "duplicate": {
               "type": "boolean"
+            },
+            "control_target": {
+              "enum": ["rover", "manipulator"]
             }
           },
           "required": [

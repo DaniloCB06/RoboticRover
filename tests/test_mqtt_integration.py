@@ -285,3 +285,30 @@ def test_dashboard_http_and_websocket(wire, simulator):
         snap = json.loads(resp.read().decode("utf-8"))
         assert snap["simulated"] is True
         assert snap["telemetry"] is not None
+
+
+def test_dashboard_manual_takeover_preserves_command_id(wire, simulator):
+    _, client_id = simulator()
+    assert wire.send(make_command(), expected_source=client_id)["data"]["accepted"]
+
+    def dashboard_command(body):
+        command_id = str(uuid4())
+        body["command_id"] = command_id
+        after = len(wire.records)
+        request = Request(NODE_RED_URL + "/api/rover/command", data=json.dumps(body).encode(),
+                          headers={"Content-Type": "application/json"}, method="POST")
+        with urlopen(request, timeout=5) as response:
+            assert response.status == 202
+        return wire.wait("rover/cmd/ack", lambda p: p["source"] == client_id and
+                         p["data"]["command_id"] == command_id, after)
+
+    rejected = dashboard_command({"kind": "mode", "mode": "CAPTURA_MANUAL", "operator_override": True})
+    assert rejected["data"]["reason"] == "MANUAL_OVERRIDE_REQUIRES_STOP"
+    assert dashboard_command({"kind": "manual", "action": "PARAR", "take_control": True})["data"]["accepted"]
+    accepted = dashboard_command({"kind": "mode", "mode": "CAPTURA_MANUAL", "operator_override": True})
+    assert accepted["data"]["accepted"] and accepted["data"]["state"] == "CAPTURA_MANUAL"
+    arm = dashboard_command({"kind": "manual", "action": "SUBIR", "target": "manipulator", "duration_ms": 500})
+    assert arm["data"]["accepted"] and arm["data"]["control_target"] == "manipulator"
+    states = [p for topic, p, _ in wire.records if topic == "rover/estado" and p["source"] == client_id]
+    assert any(p["data"].get("arm_motion") == "SUBIR" and p["data"]["motion"] == "PARAR" for p in states)
+    assert dashboard_command({"kind": "manual", "action": "AVANCAR", "duration_ms": 500})["data"]["accepted"]

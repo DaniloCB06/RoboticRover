@@ -47,7 +47,11 @@ def test_dashboard_nodes_and_html_sync():
     assert 'typeof p.simulated !== "boolean"' in by_id["validate"]["func"]
     assert "WebRTC (WHEP)" in html
     assert "MJPEG HTTP" in html
-    assert "rover/telemetria" in html
+    assert 'id="telemetryModal" hidden' in html
+    assert 'data-view="satellite"' in html
+    assert 'data-mode="CAPTURA_MANUAL"' in html
+    assert 'id="eventList"' in html
+    assert 'id="simBadge"' not in html
 
 
 def test_retained_policy():
