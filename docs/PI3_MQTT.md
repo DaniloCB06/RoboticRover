@@ -2,6 +2,13 @@
 
 Este pacote complementa o repositório principal para o **teste de fumaça MQTT da Raspberry Pi 3** (`roboticrover_pi3`), coexistindo com o simulador completo (`rover`) e com a Dashboard do Node-RED.
 
+**Validado na Pi real em 17/11/2026:** 21 testes locais ARM64, 14 cenários de
+comando/ACK por MQTT e perda de heartbeat com retorno à espera. Consulte o
+[registro do primeiro teste](PI3_PRIMEIRO_TESTE_2026-11-17.md) para ambiente,
+limites e comandos de inicialização sem Docker, usando túnel SSH. Nesse teste,
+`127.0.0.1:18883` na Pi representa o túnel para o broker do Mac; os passos de
+acesso direto por IP da LAN abaixo são uma alternativa de implantação.
+
 ## O que está pronto
 
 - Cliente MQTT 5/Paho em Python (`apps/rover/roboticrover_pi3`, mesmos tópicos do Node-RED).
