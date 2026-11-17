@@ -1,0 +1,25 @@
+============================================================
+Mosquitto:
+ cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
+
+.venv/bin/mosquitto \
+  -c infra/mqtt/mosquitto.conf 
+============================================================
+
+
+============================================================
+Node-Red:
+cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
+
+NODE_RED_HOST=127.0.0.1 node-red \
+  --settings apps/station/node-red/settings.js \
+  apps/station/node-red/flows.json   
+============================================================
+
+
+============================================================
+SIMULAR_ROVER:
+cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
+
+.venv/bin/python -m rover
+============================================================

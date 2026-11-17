@@ -1,9 +1,9 @@
 # RoboticRover — Auditoria comparativa e roadmap de software
 
-**Data:** 16/11/2026  
+**Data:** 16/11/2026; atualização de integração real: 17/11/2026
 **Escopo:** código, protocolos, firmware, visão computacional, integração, segurança, testes e implantação. Não é um roadmap de fabricação mecânica/elétrica, embora indique dependências de hardware que bloqueiam o software.  
 **Referência de repositório:** https://github.com/DaniloCB06/RoboticRover/tree/main  
-**Estado da evidência:** revisão direta do checkout local, do código, contratos, fluxos Node-RED, firmware e testes. Baseline Git atual: `main`, commit `48dc5ea94d90191488d56894603b0b85099f4e74` (remoção dos sensores de distância e inclusão deste roadmap). As alterações posteriores de dashboard, permissões manuais e comunicação estão na árvore de trabalho e ainda não fazem parte desse commit. Foram reproduzidos nesta sessão **135 testes locais aprovados, 9 testes de integração MQTT aprovados e 21 testes isolados da Pi aprovados**, além do teste de interface no Chrome. Os 21 testes da Pi já estão incluídos nos 135, não devem ser somados. A implementação física não foi validada nesta sessão; as fontes acadêmicas citadas abaixo não estão disponíveis neste checkout para conferência independente.
+**Estado da evidência:** revisão direta do checkout local, do código, contratos, fluxos Node-RED, firmware e testes. Baseline da revisão de 16/11: `48dc5ea94d90191488d56894603b0b85099f4e74`. Versão atual da `main`, já incluindo dashboard/permissões manuais e transferida à Pi em 17/11: `18ee3255869a28a07a28aa37c9459d8a902c9a01`. Foram reproduzidos **135 testes locais aprovados, 9 testes de integração MQTT aprovados e 21 testes isolados do cliente Pi aprovados**, além do teste de interface no Chrome. Os 21 testes do cliente Pi já estão incluídos nos 135; em 17/11 também foram executados na placa real. A comunicação Mac↔Pi foi validada conforme seção 2.2; atuação física continua pendente. As fontes acadêmicas citadas abaixo não estão disponíveis neste checkout para conferência independente.
 
 ## 1. Fontes e precedência
 
@@ -30,10 +30,10 @@
 
 | Frente | O que o projeto exige | Implementação/evidência local | Diagnóstico atual | Próximo resultado verificável |
 |---|---|---|---|---|
-| Estação-base/MQTT | Comandos e telemetria ponta a ponta, sem confundir simulação com robô | Mosquitto/Node-RED nativos: 9 testes MQTT reais aprovados, incluindo HTTP/WS, ACK correlacionado, tomada manual e destino braço/rodas | **Integração local com simulador feita; Pi física pendente** | E2E com Pi e hardware reais |
+| Estação-base/MQTT | Comandos e telemetria ponta a ponta, sem confundir simulação com robô | 9 testes locais com simulador; em 17/11, Pi 3 real conectada por túnel SSH, 14 cenários comando/ACK e watchdog de heartbeat aprovados | **Comunicação Mac↔Pi real validada; atuação continua simulada** | E2E Pi↔Mega com feedback físico |
 | Dashboard | Vídeo, controle condicionado ao estado, ACK real, alarmes e operação manual | Layout responsivo; modos no topo; Rover/Satélite; bloqueio total do direcional/teclado; alternador de destino; log único com detalhes; gráficos em popup; QA Chrome aprovado | **Interface e intertravamentos de software entregues; atuação física pendente** | Vídeo e feedback físicos; intertravamento validado no robô |
 | Simulador Python | Simular FSM, erros, MQTT e falhas | FSM, watchdog, TTL, UUID, LWT, deduplicação, autorização manual e ações de braço separadas da tração, com testes | **Implementação simulada verificada** | Contrato unificado com cliente real; integração serial |
-| Cliente Raspberry Pi 3 | Supervisão da missão + webcam + MQTT + USB Mega | MQTT, autorização manual, `approach_completed()`, destino braço/rodas e 21 testes isolados; ainda sem serial/atuação | **Parcial; duas FSMs continuam existindo** | Serviço único com ponte serial, vídeo e FSM canônica |
+| Cliente Raspberry Pi 3 | Supervisão da missão + webcam + MQTT + USB Mega | Instalado em Pi 3 B ARM64 com Python 3.13.5; 21 testes executados na placa e MQTT real validado; ainda sem serial/atuação | **Cliente embarcado operacional para teste MQTT; integração física parcial** | Serviço único com ponte serial, vídeo e FSM canônica |
 | Protocolo MQTT | Mesmo contrato para real/simulado; observações visuais datadas | Schema v1 ampliado com `manual_enabled`, `target`, `control_target`, `take_control` e `arm_motion`; schema central ainda exige `simulated: true`, enquanto a Pi usa validador próprio | **Permissões/destinos integrados; unificação e observações pendentes** | Schemas versionados e testes cruzados completos |
 | Protocolo Pi↔Mega | Comando/telemetria/ACK/timeout/integridade | **Ausente** | **Bloqueio crítico** | Protocolo especificado, codificado e exercitado em loopback |
 | Arduino Mega | Ponte H, encoder/PID, sensores, proteção, servos | Repassador serial transparente | **Bloqueio crítico de segurança** | Firmware controlador com watchdog, estados e hardware em bancada |
@@ -69,6 +69,14 @@ Inventário das frentes revisadas: `apps/rover/rover` (simulador), `apps/rover/r
 | Comunicação Mega/ArbotiX | `firmware/arduino-mega/`, `firmware/arbotix-board/` | Código lido; ensaios físicos relatados na documentação não foram reproduzidos; sem toolchain Arduino/PlatformIO disponível |
 
 As fontes acadêmicas citadas na seção 1 não estão no checkout. A auditoria do software não confirma independentemente regras de competição, modelo de hardware, pesos YOLO ou autorização para uso de AprilTags.
+
+### 2.2. Integração real da Pi em 17/11/2026
+
+Versão transferida: `18ee3255869a28a07a28aa37c9459d8a902c9a01`, posterior ao baseline da revisão anterior. Pi 3 Model B Rev 1.2, Debian 13.7 ARM64, Python 3.13.5, paho-mqtt 2.2.0 e python-dotenv 1.2.4. Checkout em `/home/puc/RoboticRover`; ambiente isolado em `apps/rover/.venv`. Broker/Node-RED nativos no Mac, MQTT restrito ao loopback e transportado por túnel SSH reverso. Nenhum serviço de boot/systemd foi configurado.
+
+Foram executados **21 testes unitários na própria Pi**, **14 cenários de comando/ACK pela estação contra o processo na Pi** e **teste de perda de heartbeat**: parar o Node-RED resultou em SEGURO_ESPERA, `manual_enabled: false` e alarme `STATION_HEARTBEAT_TIMEOUT`. O Node-RED foi reiniciado e o cliente ficou em espera. Status Linux real (`simulated: false`, hostname `puc`); comandos/estados continuam `simulated_only`. Sem GPIO/serial, atuação, streaming ou sensores reais integrados.
+
+Ambiente, resultados e comandos para repetir estão em [docs/PI3_PRIMEIRO_TESTE_2026-11-17.md](docs/PI3_PRIMEIRO_TESTE_2026-11-17.md). Os 14 cenários são uma verificação de integração na placa; não alteram a contagem da suíte pytest local de 135 testes.
 
 ## 3. Arquitetura-alvo de software
 
@@ -116,6 +124,7 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [x] Inspecionar a `main` local, registrar SHA, inventário das pastas, versões de Python/Node/Node-RED/Mosquitto e configuração de dependências; distinguir alterações ainda não commitadas (seção 2.1).
 - [x] Executar suíte local e suíte isolada da Pi no Mac; registrar **135 aprovados / 9 ignorados** e **21 OK**, respectivamente.
 - [x] Executar integração com broker/Node-RED reais e simulador, sem Docker: **9 aprovados**, incluindo controle manual e destino braço/rodas.
+- [x] Instalar o checkout e as dependências em uma .venv da Pi 3 real e reproduzir os **21 testes unitários em Python 3.13/ARM64**; registrar versões e SHA (seção 2.2).
 - [!] Configurar toolchains/placas e compilar os firmwares Mega e ArbotiX; registrar versões Arduino e bibliotecas utilizadas.
 - [-] Mapear cada função relatada a arquivo, classe, testes e evidência; identificar código morto/duplicado e documentação antiga/ZIP histórico.
 - [x] Identificar a sobreposição dos clientes `rover`/`roboticrover_pi3` e o ZIP/backup históricos; registrar a matriz de evidências local. A auditoria das fontes acadêmicas e a cobertura de firmware permanecem pendentes.
@@ -253,6 +262,7 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [-] Fault injection: Wi-Fi/broker offline, serial removida, Mega reset, imagem congelada, inferência atrasada, ruído CRC, peça desaparece, servo ausente, bateria baixa, browser fecha, comando duplicado/retained.
 - [x] Reproduzir os testes Python atuais de contratos/FSM/watchdog/autorização/destino: **135 aprovados**, incluindo rejeição de ação incompatível e separação braço/tração.
 - [x] Reproduzir os **9 testes MQTT locais** com Mosquitto/Node-RED nativos, incluindo ACK correlacionado por UUID, rejeições, LWT, reconexão e tomada de controle/destino do manipulador.
+- [x] Validar **14 cenários Mac↔Pi real** de comando/ACK, autorização e rejeição por estado/destino; testar a perda do heartbeat da estação com retorno à espera e revogação manual. Permanecem pendentes Wi-Fi/USB físicos interrompidos, MCU, atuadores e arena.
 - [x] Adicionar e executar `tests/dashboard_browser.cjs` no Chrome: bloqueio total durante automático, WASD/setas/cliques, conclusão da aproximação simulada, Espaço, alternador, popups, desconexão e responsividade. O transporte é simulado nesse teste; a comunicação real é coberta pela suíte MQTT separada.
 - [!] HIL em bancada, depois rodagem em arena, com limitação de velocidade e registro de distância de parada, taxa de sucesso, latências, FPS e pontuação efetiva por ciclo.
 - [!] Executar repetidamente ciclo completo dentro dos 4 minutos, incluindo troca de ferramenta se usada; documentar vídeos/logs e ações de recuperação.
