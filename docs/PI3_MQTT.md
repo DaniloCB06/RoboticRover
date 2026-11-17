@@ -20,6 +20,10 @@ acesso direto por IP da LAN abaixo são uma alternativa de implantação.
 
 **Ainda não:** controle real do Arduino, sensores reais, visão computacional, streaming real da câmera física e endpoints externos do professor.
 
+**Atualização de câmera em 17/11/2026:** captura USB e streaming MJPEG reais
+foram implementados em processo separado; consulte [PI3_CAMERA.md](PI3_CAMERA.md).
+A limitação acima sobre streaming descreve apenas o pacote MQTT isolado.
+
 ## Testar agora no notebook (sem a Raspberry Pi 3)
 
 Você pode rodar a partir da raiz do monorepo (usando a `.venv` principal) ou diretamente dentro de `apps/rover`:

@@ -306,6 +306,11 @@ Após editar `dashboard.html`, sincronize o template e reinicie o Node-RED:
 node apps/station/node-red/sync-dashboard.js
 ```
 
+A webcam USB da Pi 3 já pode alimentar a **Visão Rover** por MJPEG através de
+túnel SSH, com indicação de FPS e reconexão. Instalação, comandos, limites de
+frescor e resultados medidos estão em [docs/PI3_CAMERA.md](docs/PI3_CAMERA.md).
+O módulo é executado separadamente: `python -m roboticrover_pi3.camera`.
+
 ---
 
 ### 5.2. Roteiro pelo Editor do Node-RED (<http://127.0.0.1:1880/#flow/rover-tab>)
@@ -328,14 +333,14 @@ node apps/station/node-red/sync-dashboard.js
   ```bash
   .venv/bin/python -m pytest -q
   ```
-*(Resultado esperado: **135 aprovados** e **9 ignorados**, referentes aos testes de integração real).*
+*(Resultado esperado: **149 aprovados** e **9 ignorados**, referentes aos testes de integração real).*
 
 Também é possível rodar isoladamente a suíte `unittest` do pacote da Raspberry Pi 3:
 ```bash
 cd apps/rover
 ../../.venv/bin/python -m unittest discover -s tests -v
 ```
-*(Resultado esperado: **21 testes aprovados**).*
+*(Resultado esperado: **29 testes aprovados**).*
 
 ### 6.2. Testes de Integração Real (com Mosquitto e Node-RED ativos — Com ou Sem Docker)
 

@@ -12,14 +12,36 @@ Node-Red:
 cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
 
 NODE_RED_HOST=127.0.0.1 node-red \
+  --userDir .runtime/pi3-bootstrap/node-red \
   --settings apps/station/node-red/settings.js \
-  apps/station/node-red/flows.json   
+  "$PWD/apps/station/node-red/flows.json"
 ============================================================
 
 
 ============================================================
-SIMULAR_ROVER:
+SIMULAR_ROVER: (local)
 cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
 
 .venv/bin/python -m rover
 ============================================================
+
+============================================================
+Conectar o RASPBERRYPI3 aos tuneis:
+ssh -M -S /private/tmp/roboticrover-pi3.sock \
+  -o ExitOnForwardFailure=yes \
+  -R 127.0.0.1:18883:127.0.0.1:1883 \
+  -L 127.0.0.1:8081:127.0.0.1:8080 \
+  puc@192.168.1.113
+
+cd /home/puc/RoboticRover/apps/rover
+MQTT_HOST=127.0.0.1 MQTT_PORT=18883 .venv/bin/python -m roboticrover_pi3
+============================================================
+
+============================================================
+Seesao WebCam:
+ssh -S /private/tmp/roboticrover-pi3.sock puc@192.168.1.113
+
+cd /home/puc/RoboticRover/apps/rover
+.venv/bin/python -m roboticrover_pi3.camera
+============================================================
+

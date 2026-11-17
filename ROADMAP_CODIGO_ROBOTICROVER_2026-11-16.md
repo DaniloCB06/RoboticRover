@@ -40,7 +40,7 @@
 | Servos AX-12A/ArbotiX | Posição, velocidade, limites e feedback reais | PING/GET/SET experimental; testes físicos 1 e 4 relatados | **Experimental** | Testes de todas as juntas com falhas/limites |
 | Motores NXT | PWM/direção + realimentação se encoder validado | Ausentes do firmware funcional relatado | **Ausente** | Rodas giram/param com limites; encoder e controle de velocidade |
 | Sensores reais | Bateria/temperatura e alertas; sem sensores dedicados de distância/movimento | `proximity_cm`, radar e leituras frontais removidos, inclusive backup/ZIP; bateria/temperatura ainda artificiais | **Remoção concluída; leitura real pendente** | Drivers/leituras medidas em bancada e publicadas |
-| Vídeo da webcam | Pi→estação com atraso controlado | Players MJPEG/WHEP/iframe e URLs independentes Rover/Satélite; sem vídeo artificial ou stream físico validado | **Receptor web pronto; captura/stream na Pi ausentes** | Stream real + reconexão, medição de idade/latência |
+| Vídeo da webcam | Pi→estação com atraso controlado | Webcam USB real, FFmpeg/Python, MJPEG por túnel SSH, 640×480 a ~15 FPS no produtor / ~14 FPS recebidos; renderização na dashboard e recuperação de encoder testadas | **Captura e stream reais entregues; latência óptica e integração com percepção pendentes** | Medir aquisição→exibição/observação e testar reconexão USB física |
 | YOLO na estação | Detectar 6 geometrias, 5 cores na arena real | `vision/README.md` placeholder | **Código não evidenciado** | Serviço de inferência com pesos versionados/testados |
 | AprilTags/distância | Estimar distância **à peça** ou invalidar medida | Não evidenciado | **Ausente** | Calibração e avaliação de erro real; associação tag↔peça |
 | Navegação autônoma | Busca, seleção, alinhamento, aproximação e parada antes da peça | Ausente do robô físico | **Ausente** | Missão autônoma repetível em arena de teste |
@@ -77,6 +77,30 @@ Versão transferida: `18ee3255869a28a07a28aa37c9459d8a902c9a01`, posterior ao ba
 Foram executados **21 testes unitários na própria Pi**, **14 cenários de comando/ACK pela estação contra o processo na Pi** e **teste de perda de heartbeat**: parar o Node-RED resultou em SEGURO_ESPERA, `manual_enabled: false` e alarme `STATION_HEARTBEAT_TIMEOUT`. O Node-RED foi reiniciado e o cliente ficou em espera. Status Linux real (`simulated: false`, hostname `puc`); comandos/estados continuam `simulated_only`. Sem GPIO/serial, atuação, streaming ou sensores reais integrados.
 
 Ambiente, resultados e comandos para repetir estão em [docs/PI3_PRIMEIRO_TESTE_2026-11-17.md](docs/PI3_PRIMEIRO_TESTE_2026-11-17.md). Os 14 cenários são uma verificação de integração na placa; não alteram a contagem da suíte pytest local de 135 testes.
+
+### 2.3. Webcam real integrada em 17/11/2026
+
+A webcam UVC `1908:2310` foi identificada e capturada pelo dispositivo estável
+`/dev/v4l/by-id/usb-Generic_USB2.0_PC_CAMERA-video-index0`. O novo módulo
+`roboticrover_pi3.camera` roda separado do MQTT, usa FFmpeg existente e entrega
+MJPEG no loopback da Pi (8080), acessível por SSH no loopback do Mac (8081).
+A Visão Rover recebe o endpoint automaticamente do Node-RED, mostra FPS e
+oculta quadros antigos enquanto retenta a conexão. Visão Satélite permanece
+independente, sem segunda câmera instalada.
+
+Foi observado vídeo real no Chrome, 640×480, produtor próximo de 15 FPS; uma
+medição no Mac recebeu 70 quadros em 5,02 s (~13,94 FPS / 1,65 Mbps). A pausa
+controlada do encoder foi detectada, seguida de reinício e recuperação da imagem
+no navegador. **8 testes novos de câmera**, **29 testes do pacote executados na
+Pi** e **149 testes locais aprovados / 9 ignorados**; os 14 cenários MQTT/API
+contra a Pi também passaram com vídeo ativo. Os 149 incluem testes de visão já
+existentes no checkout, além dos novos testes de câmera. As alterações de câmera
+foram aplicadas na árvore de trabalho local e copiadas à Pi, sem novo commit.
+
+Os timestamps identificam o recebimento do JPEG do encoder, não a exposição do
+sensor. Ainda pendem latência óptica, foco/calibração, desconexão USB física,
+associação com detecções e intertravamento da navegação por saúde do vídeo.
+Detalhes e comandos: [docs/PI3_CAMERA.md](docs/PI3_CAMERA.md).
 
 ## 3. Arquitetura-alvo de software
 
@@ -200,11 +224,14 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - **Aceite:** operador executa captura e soltura, com limites ativos, sem colisão e com telemetria de juntas.
 
 **[-] R8. Streaming da webcam Pi→estação**
-- [!] Descobrir `/dev/video*`, resoluções/FPS suportados pela webcam real, lidar com desconexão e reinício do serviço.
+- [-] Descobrir `/dev/video*`, resoluções/FPS suportados pela webcam real, lidar com desconexão e reinício do serviço. Dispositivo e formatos confirmados; recuperação de encoder testada, falta retirar/reconectar fisicamente o USB.
 - [-] Implementar canal separado do MQTT para MJPEG ou WebRTC; decidir por teste de latência e facilidade, com autenticação/rede adequada.
-- [ ] Incluir `frame_id`, timestamp no instante da captura e associação consistente entre frames e observações, mesmo com buffers e perdas.
+- [-] Incluir `frame_id`, timestamp no instante da captura e associação consistente entre frames e observações, mesmo com buffers e perdas. IDs sessão/sequência e timestamp de recebimento pós-encoder implementados; aquisição/exposição e associação a detecções continuam pendentes.
 - [-] Exibir vídeo na dashboard; medir atraso de captura→exibição e captura→observação→Pi. Descartar frames antigos em vez de processar fila longa.
 - [x] Implementar seleção Visão Rover/Visão Satélite, configuração independente por câmera em popup e persistência das URLs no navegador, com players MJPEG/WHEP/iframe. Validar interação da interface, sem alegar recepção de stream físico.
+- [x] Identificar a webcam USB real e os formatos anunciados; capturar JPEG válido e entregar stream MJPEG separado de MQTT, sem dependências pip novas e sem acesso a atuadores.
+- [x] Exibir na dashboard vídeo real da Pi por túnel SSH, com configuração automática da Visão Rover, indicador AO VIVO/FPS e endpoints de saúde/snapshot.
+- [x] Manter somente o quadro mais recente, rejeitar imagens antigas, limitar clientes e reiniciar encoder interrompido; testar ocultação de imagem congelada e recuperação automática no navegador.
 - [ ] Pausar movimento autônomo quando stream/percepção estiverem indisponíveis ou vencidos; teleop também deve respeitar visibilidade segura.
 - **Aceite:** streaming estável na Pi 3 real, reconecta e não autoriza movimento baseado em imagem antiga.
 
@@ -264,6 +291,7 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [x] Reproduzir os **9 testes MQTT locais** com Mosquitto/Node-RED nativos, incluindo ACK correlacionado por UUID, rejeições, LWT, reconexão e tomada de controle/destino do manipulador.
 - [x] Validar **14 cenários Mac↔Pi real** de comando/ACK, autorização e rejeição por estado/destino; testar a perda do heartbeat da estação com retorno à espera e revogação manual. Permanecem pendentes Wi-Fi/USB físicos interrompidos, MCU, atuadores e arena.
 - [x] Adicionar e executar `tests/dashboard_browser.cjs` no Chrome: bloqueio total durante automático, WASD/setas/cliques, conclusão da aproximação simulada, Espaço, alternador, popups, desconexão e responsividade. O transporte é simulado nesse teste; a comunicação real é coberta pela suíte MQTT separada.
+- [x] Executar 8 testes de câmera e a suíte de 29 testes na Pi, observar stream real na dashboard e testar watchdog/recuperação do encoder; repetir os cenários MQTT com vídeo ativo. Resultado local atual: 149 aprovados / 9 ignorados (seção 2.3).
 - [!] HIL em bancada, depois rodagem em arena, com limitação de velocidade e registro de distância de parada, taxa de sucesso, latências, FPS e pontuação efetiva por ciclo.
 - [!] Executar repetidamente ciclo completo dentro dos 4 minutos, incluindo troca de ferramenta se usada; documentar vídeos/logs e ações de recuperação.
 - **Aceite:** registro mensurável de segurança, repetibilidade e resgate completo; sem falhas críticas abertas.
@@ -301,7 +329,7 @@ flowchart LR
 - [ ] Segurança local Mega e STOP comprovados.
 - [ ] MQTT↔Pi↔Mega com controle e feedback reais.
 - [ ] Tração diferencial operando com limites e encoders/controlador se validado.
-- [ ] Vídeo real do Rover para a estação e dashboard.
+- [x] Vídeo real do Rover para a estação e dashboard (MJPEG por túnel SSH, 640×480; seção 2.3). Calibração e integração com percepção continuam em R8/R9.
 - [ ] YOLO na estação e estimativa de aproximação validada/limitada; dados datados.
 - [ ] Busca e aproximação autônomas, parada física confirmada.
 - [ ] Captura manual do braço + retorno **manual** + depósito funcional.
@@ -364,7 +392,7 @@ Em cada PR: escopo restrito, testes automatizados, atualização de contratos/do
 
 ## 10. Conclusão
 
-O checkout revisado já entrega a **estação-base, simulação, dashboard responsiva, autorização manual, separação braço/rodas e testes locais/MQTT/browser**. Essas entregas estão marcadas individualmente como concluídas; nenhum marco R0–R14 atingiu ainda todo o seu aceite. A integração serial, a segurança local do Mega, tração/encoders, visão, streaming físico, captura/soltura e validação em arena permanecem pendentes. O caminho crítico continua **R1→R2→R3→R4/R5→R6**, em paralelo a **R8→R9** e **R7**, convergindo em **R10→R11→R14**. A primeira missão física deve completar busca/aproximação, captura manual, retorno manual e depósito antes do retorno autônomo.
+O checkout revisado já entrega a **estação-base, simulação, dashboard responsiva, autorização manual, separação braço/rodas, comunicação com Pi real e vídeo USB/MJPEG real na dashboard**, com testes locais/MQTT/browser. Essas entregas estão marcadas individualmente como concluídas; nenhum marco R0–R14 atingiu ainda todo o seu aceite. A integração serial, a segurança local do Mega, tração/encoders, percepção integrada ao vídeo, captura/soltura e validação em arena permanecem pendentes. O caminho crítico continua **R1→R2→R3→R4/R5→R6**, em paralelo ao restante de **R8→R9** e **R7**, convergindo em **R10→R11→R14**. A primeira missão física deve completar busca/aproximação, captura manual, retorno manual e depósito antes do retorno autônomo.
 
 ### Referências de revisão local
 

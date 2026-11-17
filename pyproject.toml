@@ -15,6 +15,7 @@ dev = ["pytest==8.3.5", "PyYAML==6.0.2", "websocket-client==1.8.0"]
 [project.scripts]
 rover-sim = "rover.__main__:main"
 rover-pi3 = "roboticrover_pi3.main:main"
+rover-camera = "roboticrover_pi3.camera:main"
 
 [tool.setuptools]
 packages = ["rover", "roboticrover_pi3", "rover_contracts", "vision"]

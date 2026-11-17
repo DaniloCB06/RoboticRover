@@ -52,6 +52,8 @@ def test_dashboard_nodes_and_html_sync():
     assert 'data-mode="CAPTURA_MANUAL"' in html
     assert 'id="eventList"' in html
     assert 'id="simBadge"' not in html
+    assert by_id["camera-config-http-in"]["url"] == "/api/rover/cameras"
+    assert 'id="cameraStatus"' in html
 
 
 def test_retained_policy():
