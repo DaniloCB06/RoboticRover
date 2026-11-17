@@ -17,8 +17,8 @@ rover-sim = "rover.__main__:main"
 rover-pi3 = "roboticrover_pi3.main:main"
 
 [tool.setuptools]
-packages = ["rover", "roboticrover_pi3", "rover_contracts"]
-package-dir = { rover = "apps/rover/rover", roboticrover_pi3 = "apps/rover/roboticrover_pi3", rover_contracts = "shared/contracts" }
+packages = ["rover", "roboticrover_pi3", "rover_contracts", "vision"]
+package-dir = { rover = "apps/rover/rover", roboticrover_pi3 = "apps/rover/roboticrover_pi3", rover_contracts = "shared/contracts", vision = "vision" }
 
 [tool.setuptools.package-data]
 rover_contracts = ["v1/*.json"]
