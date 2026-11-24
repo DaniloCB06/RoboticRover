@@ -23,6 +23,8 @@ Por padrão, o script conecta a `puc@puc.local`, solicita a senha SSH no própri
 
 Se o usuário ou caminho do projeto na Pi forem diferentes, use `--pi usuario@IP` e `--pi-dir /caminho/absoluto/RoboticRover`. `--mac-ip` permite informar o IPv4 do Mac quando necessário.
 
+Por padrão, o iniciador força `MOTOR_BACKEND=simulation` na Pi, mesmo que o `.env` remoto contenha uma opção física antiga. Para o teste futuro com o Mega preparado, use `--motor-backend serial --serial-port /dev/serial/by-id/IDENTIFICADOR_REAL` e, opcionalmente, `--motor-pwm 80`, `--invert-left` ou `--invert-right`. Isso vale nos modos 1 e 2. A instalação do extra `motor-control`, a escolha do firmware/pinagem e o roteiro estão em [CONTROLE_MANUAL_MOTORES.md](CONTROLE_MANUAL_MOTORES.md).
+
 ## Processos iniciados
 
 | Processo | Modo 1 | Modo 2 |

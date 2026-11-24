@@ -1,4 +1,4 @@
-"""Máquina de estados SOMENTE PARA TESTE. Atuações reais estão proibidas."""
+"""FSM sem I/O. A ponte serial aplica a decisão e confirma o ACK separadamente."""
 from __future__ import annotations
 
 import time
@@ -108,8 +108,7 @@ class SimulatedController:
             return Decision(command_id, True, "state_transition_simulated", self.state,
                             control_target=self.control_target)
 
-        # Não temos atuadores integrados: qualquer movimento é apenas reconhecido
-        # no software e nunca enviado ao hardware.
+        # A FSM valida permissões; somente o adaptador de hardware pode atuar.
         if self.state != "CAPTURA_MANUAL":
             return Decision(command_id, False, "manual_command_not_allowed_in_state", self.state)
         target = data.get("target", "rover")

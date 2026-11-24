@@ -358,12 +358,23 @@ def main():
     parser.add_argument("--pi", default=os.getenv("ROVER_SSH", "puc@puc.local"))
     parser.add_argument("--pi-dir", default="/home/puc/RoboticRover")
     parser.add_argument("--mac-ip", help="IPv4 do Mac; por padrão é obtido da sessão SSH")
+    parser.add_argument("--motor-backend", choices=("simulation", "serial"), default="simulation",
+                        help="Tração: simulation (padrão) ou serial (somente após preparar Mega/fiação)")
+    parser.add_argument("--serial-port", default="", help="Porta /dev/serial/by-id/... do Mega na Pi")
+    parser.add_argument("--motor-pwm", type=int, default=80, help="PWM de bancada (1..120)")
+    parser.add_argument("--invert-left", action="store_true", help="Inverte o sentido do motor esquerdo")
+    parser.add_argument("--invert-right", action="store_true", help="Inverte o sentido do motor direito")
     parser.add_argument("--dry-run", action="store_true", help="Exibe o plano sem iniciar processos ou SSH")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+", args.pi):
         parser.error("Use --pi usuario@IP ou usuario@hostname")
     if not args.pi_dir.startswith("/") or any(char in args.pi_dir for char in "\n\r\0"):
         parser.error("--pi-dir deve ser um caminho absoluto válido")
+    from roboticrover_pi3.motors import MotorConfig
+    try:
+        MotorConfig(backend=args.motor_backend, port=args.serial_port, pwm=args.motor_pwm)
+    except ValueError as exc:
+        parser.error(str(exc))
     mode = choose_mode(args.mode)
     arena = (Arena.from_env() if mode == 2 else
              Arena(os.getenv("COMPETITION_HOST") or "127.0.0.1", os.getenv("COMPETITION_TEAM") or "rover04",
@@ -371,6 +382,7 @@ def main():
     config = {"COMPETITION_HOST": arena.host, "COMPETITION_TEAM": arena.team,
               "COMPETITION_PASSWORD": arena.password, "COMPETITION_MQTT_PORT": str(arena.port)}
     if args.dry_run:
+        print(f"Tração: {args.motor_backend}; PWM máximo {args.motor_pwm}; porta {args.serial_port or 'não utilizada'}")
         mac_ip = args.mac_ip or "IP_MAC_OBTIDO_PELO_SSH"
         local, remote = build_commands(mode, mac_ip, args.pi_dir, config)
         for name, command, _ in local:
@@ -421,6 +433,12 @@ def main():
             remote_environment = dict(config, MQTT_HOST="127.0.0.1", MQTT_PORT="18883", MQTT_CLIENT_ID="roboticrover-pi3",
                                       MQTT_USER="", MQTT_USERNAME="", MQTT_PASSWORD="", ENABLE_MOCK_TELEMETRY="false",
                                       COMPETITION_MOCK_BATTERY="0", COMPETITION_TELEMETRY_DIR=".runtime/competition")
+            # Nunca herda um backend físico antigo do .env remoto sem opt-in na CLI.
+            remote_environment.update(MOTOR_BACKEND=args.motor_backend, MOTOR_SERIAL_PORT=args.serial_port,
+                                      MOTOR_PWM=str(args.motor_pwm), MOTOR_LEASE_MS="300",
+                                      MOTOR_INVERT_LEFT="1" if args.invert_left else "0",
+                                      MOTOR_INVERT_RIGHT="1" if args.invert_right else "0",
+                                      STATION_SOURCE=os.getenv("STATION_SOURCE", "station-nodered"))
             launcher.start_remote(remote, remote_environment)
             print("\nServiços iniciados. Dashboard: http://127.0.0.1:1880/dashboard", flush=True)
             print(f"Vídeo local: http://127.0.0.1:8890/rover/{arena.team}", flush=True)

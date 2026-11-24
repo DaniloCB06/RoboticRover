@@ -1,6 +1,8 @@
 # RoboticRover
 
-Infraestrutura MQTT, cliente da Raspberry Pi 3 e **Dashboard do Operador**. O vídeo pode vir da webcam real; os comandos de tração e braço no cliente Python continuam em simulação, sem atuar no hardware.
+Infraestrutura MQTT, cliente da Raspberry Pi 3 e **Dashboard do Operador**. O vídeo pode vir da webcam real. A tração tem uma ponte USB opt-in para Mega/NXT e firmware de bancada; o padrão continua em simulação. O braço ainda não tem atuação integrada.
+
+O caminho dashboard → MQTT → Pi → Mega foi preparado e verificado com firmware virtual, sem acionar hardware. Para o teste físico futuro, consulte [CONTROLE_MANUAL_MOTORES.md](docs/CONTROLE_MANUAL_MOTORES.md).
 
 A estação-base utiliza **Mosquitto** (broker MQTT v5) e **Node-RED** (fluxos MQTT + servidor da Dashboard em <http://127.0.0.1:1880/dashboard>), com duas visões de câmera configuráveis por **WebRTC/WHEP**, player WebRTC ou **MJPEG sobre HTTP**.
 
@@ -371,7 +373,7 @@ Além do simulador completo (`python -m rover`), o repositório inclui o pacote 
 
 Características do `roboticrover_pi3`:
 - Publica `rover/status` com `simulated: false`, `online: true/false` (incluindo LWT retained) e o `hostname` real do Linux, comprovando a conectividade da placa.
-- Mantém `simulated: true` e `execution: "simulated_only"` em `rover/cmd/ack` e `rover/estado` (`hardware_actuation: false`), deixando explícito que **nenhum motor ou pino físico é acionado**.
+- Por padrão mantém ACK/estado simulados, sem abrir USB. Com `MOTOR_BACKEND=serial` explícito, usa o firmware RR1 e publica `execution: "mega_accepted"` somente após ACK do Mega; isso não confirma deslocamento físico. Veja o [roteiro de tração](docs/CONTROLE_MANUAL_MOTORES.md).
 - Não publica telemetria inventada por padrão (`ENABLE_MOCK_TELEMETRY=false`).
 - Valida UUID, TTL (`expires_at`), janela de timestamp, sessão de `station/heartbeat` e rejeita comandos `retained`.
 
@@ -430,7 +432,7 @@ Execute apenas uma instância do simulador por vez (`Ctrl+C` para parar):
   - Coloque o Rover em `BUSCA` e pare o Node-RED (`Ctrl+C` no terminal do Node-RED ou `docker compose stop node-red`).
   - Após ~4 s sem `station/heartbeat`, o simulador entra em `SEGURO_ESPERA` e emite o alarme `COMMUNICATION_LOST`.
 
-> **Aviso de Segurança Física:** A parada via MQTT **não substitui** um botão físico de emergência. O futuro firmware do Arduino Mega deverá possuir *watchdog* independente em hardware/firmware para cortar os motores imediatamente caso os comandos periódicos da Raspberry Pi deixem de chegar.
+> A parada via MQTT não substitui interrupção física da alimentação. O firmware RR1 possui watchdog local de referência; os prazos e a parada mecânica ainda precisam de medição na bancada.
 
 ---
 

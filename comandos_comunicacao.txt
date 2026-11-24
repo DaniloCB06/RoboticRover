@@ -1,6 +1,14 @@
 INICIALIZAÇÃO AUTOMÁTICA — executada no Mac, na raiz do projeto:
 .venv/bin/python inicia_comunicacao.py
 
+CONTROLE DOS MOTORES LEGO — preparação para teste físico futuro:
+Guia e pinagem: docs/CONTROLE_MANUAL_MOTORES.md
+O comando acima mantém simulação. Depois de preparar firmware e fiação:
+.venv/bin/python inicia_comunicacao.py --pi puc@IP_DA_PI --motor-backend serial --serial-port /dev/serial/by-id/IDENTIFICADOR_REAL --motor-pwm 80
+Substitua IP_DA_PI e IDENTIFICADOR_REAL antes de executar.
+Na dashboard: Espaço -> aguardar liberação -> Pilotar Rover -> segurar WASD/setas/botões.
+Soltar envia PARAR. O braço permanece sem atuação física integrada.
+
 Escolha 1 para comunicação local ou 2 para servidor do professor
 acessível pela rede local, mesmo sem internet.
 Se precisar informar o endereço da Pi:
@@ -187,3 +195,20 @@ por vez; não inicie os dois agentes de Rover juntos.
 Logs na Pi: .runtime/webrtc-camera.log e .runtime/webrtc-publisher.log
 Log no Mac: .runtime/competition-forward.log
 
+
+
+
+COMUNICAÇÃO DO DIA DO TESTE MOTORES ARDUINO:
+
+.venv/bin/python inicia_comunicacao.py \
+  --pi puc@IP_DA_PI \
+  --motor-backend serial \
+  --serial-port /dev/serial/by-id/IDENTIFICADOR_REAL \
+  --motor-pwm 80
+
+EXPLICAÇÃO:
+Substitua o IP e o identificador pela porta real do Mega.
+
+Com essa opção habilitada, após entrar no manual e selecionar Pilotar Rover, os comandos seguirão até o Mega por USB. Soltar o controle envia parada.
+
+Antes disso, o Mega precisa estar com o novo firmware rover_manual, o driver/pinagem conferidos e a Pi com a dependência motor-control instalada. Sem resposta válida do firmware, o cliente bloqueia a atuação e informa falha.

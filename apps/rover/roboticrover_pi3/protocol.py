@@ -56,6 +56,7 @@ class Received:
     data: Dict[str, Any]
     simulated: bool
     source: str
+    issued_at: Optional[datetime] = None
 
 
 def read_packet(topic: str, payload: bytes, *, received_at: Optional[datetime] = None) -> Received:
@@ -116,4 +117,4 @@ def read_packet(topic: str, payload: bytes, *, received_at: Optional[datetime] =
     else:
         if data.get("online") is not True or not isinstance(data.get("session_id"), str) or not data["session_id"]:
             raise ValueError("heartbeat inválido")
-    return Received(topic, obj["type"], data, obj["simulated"], obj["source"])
+    return Received(topic, obj["type"], data, obj["simulated"], obj["source"], timestamp)

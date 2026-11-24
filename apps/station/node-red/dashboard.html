@@ -153,7 +153,7 @@
     </section>
     <div class="footer"><span id="connectionAge">Aguardando comunicação</span><span id="executionLabel">Fonte de dados não confirmada</span></div>
   </main>
-  <div class="modal-backdrop" id="controlHelpModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="controlHelpTitle" tabindex="-1"><div class="modal-header"><h2 id="controlHelpTitle">Como controlar o Rover</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><div class="help-copy"><p><strong>Quando o controle é liberado?</strong> Ao receber a confirmação de conclusão da aproximação, o operador pode coletar a peça com o braço e depois pilotar até a área segura. Durante BUSCA e APROXIMAÇÃO, todos os botões do direcional e os atalhos ficam bloqueados e apagados.</p><p><strong>Parada forçada:</strong> pressione <kbd>Espaço</kbd> fora de campos de edição para parar a operação automática e solicitar o modo manual. A liberação depende da confirmação do Rover. Para retomar a busca automática, clique em <strong>BUSCA</strong>.</p><p><strong>Pilotar Rover:</strong> <kbd>W</kbd> / <kbd>↑</kbd> avança; <kbd>S</kbd> / <kbd>↓</kbd> recua; <kbd>A</kbd> / <kbd>←</kbd> vira à esquerda; <kbd>D</kbd> / <kbd>→</kbd> vira à direita.</p><p><strong>Controlar braço:</strong> use o alternador no canto superior direito. <kbd>W</kbd> / <kbd>↑</kbd> solicita subir; <kbd>S</kbd> / <kbd>↓</kbd> solicita descer; <kbd>A</kbd> / <kbd>←</kbd> e <kbd>D</kbd> / <kbd>→</kbd> solicitam deslocamento lateral do braço. Os comandos são identificados como manipulador e não acionam as rodas.</p><p>Você também pode clicar nas setas. <kbd>■</kbd> ou <kbd>Esc</kbd> interrompe o controle manual. Cada comando tem duração limitada de 500 ms. Trocar entre Rover e braço envia uma parada antes da troca. Perder conexão ou voltar ao automático bloqueia os controles.</p><p>Os clientes atuais apenas simulam os comandos. O braço ainda depende de integração e calibração física, incluindo captura e soltura.</p></div></section></div>
+  <div class="modal-backdrop" id="controlHelpModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="controlHelpTitle" tabindex="-1"><div class="modal-header"><h2 id="controlHelpTitle">Como controlar o Rover</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><div class="help-copy"><p><strong>Quando o controle é liberado?</strong> Ao receber a confirmação de conclusão da aproximação, o operador pode coletar a peça com o braço e depois pilotar até a área segura. Durante BUSCA e APROXIMAÇÃO, todos os botões do direcional e os atalhos ficam bloqueados e apagados.</p><p><strong>Parada forçada:</strong> pressione <kbd>Espaço</kbd> fora de campos de edição para parar a operação automática e solicitar o modo manual. A liberação depende da confirmação do Rover. Para retomar a busca automática, clique em <strong>BUSCA</strong>.</p><p><strong>Pilotar Rover:</strong> <kbd>W</kbd> / <kbd>↑</kbd> avança; <kbd>S</kbd> / <kbd>↓</kbd> recua; <kbd>A</kbd> / <kbd>←</kbd> vira à esquerda; <kbd>D</kbd> / <kbd>→</kbd> vira à direita.</p><p><strong>Controlar braço:</strong> use o alternador no canto superior direito. <kbd>W</kbd> / <kbd>↑</kbd> solicita subir; <kbd>S</kbd> / <kbd>↓</kbd> solicita descer; <kbd>A</kbd> / <kbd>←</kbd> e <kbd>D</kbd> / <kbd>→</kbd> solicitam deslocamento lateral do braço. Os comandos são identificados como manipulador e não acionam as rodas.</p><p>Você também pode pressionar e segurar as setas na tela ou as teclas para movimentar; ao soltar, o controle envia PARAR. <kbd>■</kbd> ou <kbd>Esc</kbd> interrompe o controle manual. Enquanto você segura, a interface renova comandos de duração limitada. Sem renovação, a tração USB expira em até 300 ms configurados, além do tempo de processamento a medir em bancada. Trocar entre Rover e braço envia uma parada antes da troca. Perder conexão ou voltar ao automático bloqueia os controles.</p><p>A atuação dos motores depende da habilitação explícita da tração USB e do firmware compatível no Mega; o padrão continua em simulação. O braço ainda depende de integração e calibração física, incluindo captura e soltura.</p></div></section></div>
   <div class="modal-backdrop" id="detailsModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="detailsTitle" tabindex="-1"><div class="modal-header"><h2 id="detailsTitle">Detalhes do evento</h2><button class="quiet-button" data-close type="button" aria-label="Fechar detalhes">Fechar ✕</button></div><pre id="eventDetails"></pre></section></div>
   <div class="modal-backdrop" id="telemetryModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="telemetryTitle" tabindex="-1"><div class="modal-header"><h2 id="telemetryTitle">Bateria e temperatura</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><div class="metric-grid"><div class="metric-card"><span class="eyebrow">Bateria</span><div class="metric-value" id="batteryValue">— %</div><canvas id="batteryChart" width="560" height="180" aria-label="Histórico da bateria"></canvas><small id="batterySummary">Sem amostras</small></div><div class="metric-card"><span class="eyebrow">Temperatura</span><div class="metric-value" id="temperatureValue">— °C</div><canvas id="temperatureChart" width="560" height="180" aria-label="Histórico da temperatura"></canvas><small id="temperatureSummary">Sem amostras</small></div></div><p class="source-note" id="telemetrySource">Telemetria MQTT · aguardando dados</p></section></div>
   <div class="modal-backdrop" id="cameraModal" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="cameraTitle" tabindex="-1"><div class="modal-header"><h2 id="cameraTitle">Configurar câmera</h2><button class="quiet-button" data-close type="button">Fechar ✕</button></div><form id="cameraForm"><label class="field">Transmissão<select id="cameraProtocol"><option value="mjpeg">MJPEG HTTP</option><option value="webrtc">WebRTC (WHEP)</option><option value="iframe">Player WebRTC</option></select></label><label class="field">Endereço do vídeo<input id="cameraUrl" type="url" placeholder="http://192.168.1.50:8080/?action=stream" required></label><button class="primary" type="submit">Conectar câmera</button><button class="quiet-button" id="disconnectCamera" type="button">Desconectar</button></form></section></div>
@@ -165,7 +165,7 @@
     const state = {mode:null,online:false,ws:false,fresh:false,source:null,lastStatus:0,lastPacket:0,manualEnabled:false,target:'rover',authorizing:false,events:[],seen:new Set(),history:[],view:'rover',cameraGeneration:0,pc:null,cameraAbort:null,cameraDefaults:null,cameraHealthTimer:null,cameraHealthAbort:null,cameraRetry:null,cameraHealthy:false,managedCamera:false,latestStateTime:0};
     const pending = new Map();
     let socket, activeModal, restoreFocus;
-    function showModal(id) { if(activeModal) closeModal(); restoreFocus=document.activeElement; activeModal=$(id); activeModal.hidden=false; activeModal.querySelector('[role="dialog"]').focus(); }
+    function showModal(id) { if(held)stop(false); if(activeModal) closeModal(); restoreFocus=document.activeElement; activeModal=$(id); activeModal.hidden=false; activeModal.querySelector('[role="dialog"]').focus(); }
     function closeModal() { if(!activeModal)return; activeModal.hidden=true; activeModal=null; if(restoreFocus)restoreFocus.focus(); }
     document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeModal));
     document.querySelectorAll('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal();}));
@@ -201,6 +201,7 @@
     function connected(){return state.ws&&state.online&&state.fresh;}
     function manualAllowed(){return connected()&&state.manualEnabled&&!state.authorizing&&['CAPTURA_MANUAL','AGUARDANDO_PEGA','SEGURO_ESPERA'].includes(state.mode);}
     function updateControls(){
+      if(held&&!manualAllowed()&&!state.authorizing)releaseHeld(false);
       const allowed=manualAllowed();$('controlPad').dataset.locked=String(!allowed);$('controlPad').setAttribute('aria-label',allowed?'Controle manual habilitado':'Controle manual bloqueado');
       document.querySelectorAll('[data-action]').forEach(b=>{b.disabled=!allowed;const arm=state.target==='manipulator';const label=({AVANCAR:arm?'Subir braço':'Avançar Rover',RECUAR:arm?'Descer braço':'Recuar Rover',ESQUERDA:arm?'Braço à esquerda':'Rover à esquerda',DIREITA:arm?'Braço à direita':'Rover à direita',PARAR:'Parar '+(arm?'braço':'Rover')})[b.dataset.action];b.setAttribute('aria-label',label);b.title=label;});
       $('controlTargetButton').disabled=!allowed||controlBusy;$('controlTargetButton').textContent=(state.target==='manipulator'?'Controlar braço':'Pilotar Rover')+' ⇄';
@@ -216,9 +217,17 @@
         fetch('/api/rover/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(packet)}).then(r=>{if(!r.ok)throw Error('Estação recusou o comando: HTTP '+r.status);}).catch(error=>{const p=pending.get(id);if(p){clearTimeout(p.timer);pending.delete(id);reject(error);}});
       });
     }
-    let controlBusy=false, controlGeneration=0;
+    let controlBusy=false, controlGeneration=0, held=null, heldTimer=null;
+    function releaseHeld(sendStop=true){const previous=held;held=null;clearTimeout(heldTimer);heldTimer=null;if(previous&&sendStop&&connected())stop(false);}
+    function beginHeld(action,key){
+      if(!manualAllowed()||held)return;if(action==='PARAR'){stop(false);return;}
+      const press={action,key};held=press;
+      async function repeat(){if(held!==press)return;if(!manualAllowed()){releaseHeld(false);return;}await move(action);if(held===press)heldTimer=setTimeout(repeat,120);}
+      repeat();
+    }
     function reportError(error){localEvent(error.message,'error');}
     async function selectMode(mode){
+      releaseHeld(false);
       if(mode==='SEGURO_ESPERA'){stop(false);return;}
       if(mode==='CAPTURA_MANUAL'&&!manualAllowed())return;
       if(controlBusy||!connected())return;
@@ -227,6 +236,7 @@
       catch(error){reportError(error);}finally{controlBusy=false;updateControls();}
     }
     async function stop(takeControl=false){
+      releaseHeld(false);
       const generation=++controlGeneration;state.authorizing=true;updateControls();
       try{await command({kind:'manual',action:'PARAR',target:state.target,take_control:takeControl});if(takeControl&&generation===controlGeneration&&connected()&&state.manualEnabled){await command({kind:'mode',mode:'CAPTURA_MANUAL',operator_override:true});}}
       catch(error){reportError(error);}finally{if(generation===controlGeneration)state.authorizing=false;updateControls();}
@@ -252,7 +262,7 @@
         if(state.source&&state.source!==packet.source){state.manualEnabled=false;state.mode=null;clearPending('A fonte do Rover mudou.');}
         state.source=packet.source;state.online=d.online===true;state.lastStatus=Date.now();state.fresh=!historical&&Math.abs(Date.now()-timestamp)<7000;
         $('roverStatus').textContent=state.online?'Rover: online':'Rover: offline';$('roverStatus').className='status '+(state.online?'online':'offline');
-        $('executionLabel').textContent=(packet.simulated?'Simulador':'Cliente conectado · atuação não confirmada')+' · '+packet.source;
+        $('executionLabel').textContent=(d.motor_backend==='serial'?'Tração USB · movimento físico não medido':packet.simulated?'Simulador':'Cliente conectado · atuação não confirmada')+' · '+packet.source;
         if(!state.online){state.manualEnabled=false;clearPending('Rover desconectado.');}
         addEvent(packet,'status',state.online?'Rover conectado':'Rover desconectado',state.online?'info':'warn');
       }else if(packet.type==='state'){
@@ -260,7 +270,7 @@
           $('currentState').textContent=labels[d.state]||d.state;$('stateReason').textContent=d.reason||(d.hardware_actuation===false?'Validação sem atuação física':'Estado recebido');}
         addEvent(packet,'state',(labels[d.previous_state]||d.previous_state||'Início')+' → '+(labels[d.state]||d.state));
       }else if(packet.type==='ack'){
-        $('lastAck').textContent=d.accepted?'Aceito':'Rejeitado';$('lastAck').style.color=d.accepted?'var(--green)':'var(--red)';const targetLabel=d.control_target==='manipulator'?'Braço':'Rover';$('ackReason').textContent=targetLabel+' · '+d.reason+(d.duplicate?' · duplicata':'');
+        $('lastAck').textContent=d.accepted?(d.execution==='mega_accepted'?'Mega aceitou':'Aceito'):'Rejeitado';$('lastAck').style.color=d.accepted?'var(--green)':'var(--red)';const targetLabel=d.control_target==='manipulator'?'Braço':'Rover';$('ackReason').textContent=targetLabel+' · '+d.reason+(d.duplicate?' · duplicata':'');
         addEvent(packet,'ack',(d.accepted?'Comando aceito':'Comando rejeitado')+' · '+targetLabel+' · '+d.reason,d.accepted?'info':'warn');
         if(!historical){const request=pending.get(d.command_id);if(request){clearTimeout(request.timer);pending.delete(d.command_id);d.accepted?request.resolve(d):request.reject(new Error(d.reason));}}
       }else if(packet.type==='telemetry'){
@@ -306,12 +316,20 @@
     $('cameraForm').addEventListener('submit',e=>{e.preventDefault();const url=new URL($('cameraUrl').value);if(!['http:','https:'].includes(url.protocol)){localEvent('A URL da câmera deve usar HTTP ou HTTPS.','error');return;}const defaults=state.cameraDefaults?.[state.view];const health_url=defaults?.url===url.href?defaults.health_url:undefined;try{localStorage.setItem('roboticrover_camera_'+state.view,JSON.stringify({protocol:$('cameraProtocol').value,url:url.href,health_url}));}catch(error){reportError(error);return;}closeModal();loadCamera();});
     $('disconnectCamera').addEventListener('click',()=>{try{localStorage.setItem('roboticrover_camera_'+state.view,JSON.stringify({disabled:true}));}catch{}stopCamera();closeModal();});
     $('telemetryButton').addEventListener('click',()=>{showModal('telemetryModal');renderTelemetry();});$('logFilter').addEventListener('change',renderLog);$('clearLog').addEventListener('click',()=>{state.events=[];state.seen.clear();renderLog();});
-    document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>selectMode(b.dataset.mode)));document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>move(b.dataset.action)));
+    document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>selectMode(b.dataset.mode)));
+    document.querySelectorAll('[data-action]').forEach(b=>{
+      b.style.touchAction='none';
+      b.addEventListener('pointerdown',e=>{if(e.button!==0||!manualAllowed())return;e.preventDefault();b.setPointerCapture(e.pointerId);beginHeld(b.dataset.action,'pointer:'+e.pointerId);});
+      for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,e=>{if(held?.key==='pointer:'+e.pointerId)releaseHeld();});
+      // Cliques por teclado/leitor de tela permanecem pulsos limitados.
+      b.addEventListener('click',e=>{if(e.detail===0)move(b.dataset.action);});
+    });
     $('controlHelpButton').addEventListener('click',()=>showModal('controlHelpModal'));
-    $('controlTargetButton').addEventListener('click',async()=>{if(!manualAllowed()||controlBusy)return;controlBusy=true;const generation=++controlGeneration;const target=state.target==='rover'?'manipulator':'rover';try{await command({kind:'manual',action:'PARAR',target});if(generation===controlGeneration&&connected()&&state.manualEnabled){state.target=target;localEvent('Controle selecionado: '+(target==='manipulator'?'braço':'pilotagem do Rover'),'info',{control_target:target});}}catch(error){reportError(error);}finally{controlBusy=false;updateControls();}});
-    window.addEventListener('keydown',e=>{if(e.defaultPrevented||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;if(e.key===' '){e.preventDefault();stop(true);return;}if(activeModal)return;const action=({escape:'PARAR',arrowup:'AVANCAR',arrowdown:'RECUAR',arrowleft:'ESQUERDA',arrowright:'DIREITA',w:'AVANCAR',s:'RECUAR',a:'ESQUERDA',d:'DIREITA'})[e.key.toLowerCase()];if(action){e.preventDefault();if(manualAllowed())move(action);}});
-    window.addEventListener('blur',()=>{if(state.mode==='CAPTURA_MANUAL')stop();});
-    document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.mode==='CAPTURA_MANUAL')stop();});
+    $('controlTargetButton').addEventListener('click',async()=>{if(!manualAllowed()||controlBusy)return;releaseHeld(false);controlBusy=true;const generation=++controlGeneration;const target=state.target==='rover'?'manipulator':'rover';try{await command({kind:'manual',action:'PARAR',target});if(generation===controlGeneration&&connected()&&state.manualEnabled){state.target=target;localEvent('Controle selecionado: '+(target==='manipulator'?'braço':'pilotagem do Rover'),'info',{control_target:target});}}catch(error){reportError(error);}finally{controlBusy=false;updateControls();}});
+    window.addEventListener('keydown',e=>{if(e.defaultPrevented||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;if(e.key===' '){e.preventDefault();stop(true);return;}if(activeModal)return;const action=({escape:'PARAR',arrowup:'AVANCAR',arrowdown:'RECUAR',arrowleft:'ESQUERDA',arrowright:'DIREITA',w:'AVANCAR',s:'RECUAR',a:'ESQUERDA',d:'DIREITA'})[e.key.toLowerCase()];if(action){e.preventDefault();if(manualAllowed())beginHeld(action,'key:'+e.key.toLowerCase());}});
+    window.addEventListener('keyup',e=>{if(held?.key==='key:'+e.key.toLowerCase()){e.preventDefault();releaseHeld();}});
+    window.addEventListener('blur',()=>{if(held||state.mode==='CAPTURA_MANUAL')stop();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden&&(held||state.mode==='CAPTURA_MANUAL'))stop();});
     window.addEventListener('beforeunload',()=>{if(state.mode==='CAPTURA_MANUAL')navigator.sendBeacon('/api/rover/command',new Blob([JSON.stringify({kind:'manual',action:'PARAR'})],{type:'application/json'}));});
     setInterval(()=>{const age=state.lastPacket?Date.now()-state.lastPacket:Infinity;state.fresh=state.online&&age<7000;if(!state.fresh)state.manualEnabled=false;$('connectionAge').textContent=Number.isFinite(age)?'Último pacote há '+(age/1000).toFixed(1)+' s':'Aguardando comunicação';updateControls();},500);
     updateControls();connect();loadCamera();

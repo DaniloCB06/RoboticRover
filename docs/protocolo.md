@@ -43,7 +43,9 @@ o manipulador aceita `SUBIR`, `DESCER`, `ESQUERDA`, `DIREITA`. Ambos aceitam
 envia uma parada com o novo `target` antes de liberar o próximo comando.
 O estado e o ACK incluem `control_target`; o simulador mantém `motion: PARAR`
 ao controlar o braço e publica a ação separadamente em `arm_motion`. Os
-clientes continuam em simulação, sem cinemática, captura/soltura ou atuação real.
+clientes usam simulação por padrão. A ponte USB opt-in da Pi controla somente a
+tração: [CONTROLE_MANUAL_MOTORES.md](CONTROLE_MANUAL_MOTORES.md). Não há cinemática,
+captura/soltura ou atuação real do braço implementada.
 
 A estação preserva o UUID opcional recebido da dashboard nos comandos HTTP/WS,
 permitindo correlacionar cada etapa ao seu ACK. Mensagens sem UUID continuam

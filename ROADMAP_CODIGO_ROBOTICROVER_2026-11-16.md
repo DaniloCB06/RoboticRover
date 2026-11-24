@@ -1,6 +1,6 @@
 # RoboticRover — Auditoria comparativa e roadmap de software
 
-**Data:** 16/11/2026; atualização de integração real: 17/11/2026
+**Data:** 16/11/2026; integração real: 17/11/2026; preparação da tração USB: 24/11/2026
 **Escopo:** código, protocolos, firmware, visão computacional, integração, segurança, testes e implantação. Não é um roadmap de fabricação mecânica/elétrica, embora indique dependências de hardware que bloqueiam o software.  
 **Referência de repositório:** https://github.com/DaniloCB06/RoboticRover/tree/main  
 **Estado da evidência:** revisão direta do checkout local, do código, contratos, fluxos Node-RED, firmware e testes. Baseline da revisão de 16/11: `48dc5ea94d90191488d56894603b0b85099f4e74`. Versão atual da `main`, já incluindo dashboard/permissões manuais e transferida à Pi em 17/11: `18ee3255869a28a07a28aa37c9459d8a902c9a01`. Foram reproduzidos **135 testes locais aprovados, 9 testes de integração MQTT aprovados e 21 testes isolados do cliente Pi aprovados**, além do teste de interface no Chrome. Os 21 testes do cliente Pi já estão incluídos nos 135; em 17/11 também foram executados na placa real. A comunicação Mac↔Pi foi validada conforme seção 2.2; atuação física continua pendente. As fontes acadêmicas citadas abaixo não estão disponíveis neste checkout para conferência independente.
@@ -102,6 +102,30 @@ sensor. Ainda pendem latência óptica, foco/calibração, desconexão USB físi
 associação com detecções e intertravamento da navegação por saúde do vídeo.
 Detalhes e comandos: [docs/PI3_CAMERA.md](docs/PI3_CAMERA.md).
 
+### 2.4. Tração manual preparada em 24/11/2026 — sem ensaio físico
+
+Implementada ponte opt-in em `roboticrover_pi3/motors.py` e firmware
+`firmware/arduino-mega/rover_manual`, com perfis DRV8833/L298N, framing ASCII RR1,
+CRC-16, sessão/sequência, HELLO/ARM/DISARM/WHEELS e ACK correlacionado.
+A Pi limita referências pela validade MQTT; o Mega tem parser incremental e
+watchdog independente. A dashboard renova enquanto tecla/ponteiro estão
+pressionados e envia PARAR ao soltar. Simulação permanece padrão.
+
+Evidência reproduzida: **29 testes** em `tests/test_manual_motors.py` com
+`RUN_MOTOR_INTEGRATION=1`, incluindo núcleo C++ real, sketch com pinos virtuais
+nos dois perfis e API HTTP Node-RED → Mosquitto → cliente Pi → Mega virtual.
+Chrome validou segurar/soltar por teclado/ponteiro, bloqueios, destinos e popups.
+Compilação AVR para Mega com CLI 1.6.0/core 1.8.6: DRV8833 8322 bytes flash/421 RAM;
+L298N 8346/423. Nenhum upload ou acionamento físico foi feito.
+Suíte local após esta entrega: **205 aprovados / 16 ignorados**; o ensaio
+opt-in acima cobre separadamente a nova integração com MQTT/Node-RED reais.
+
+ACK `mega_accepted` confirma referência aceita pelo firmware, não deslocamento.
+Valores PWM/TTL/pausa de inversão são provisórios de bancada. Ainda faltam
+identificação elétrica do driver, encoders, controle de velocidade e ensaio HIL.
+Falha serial exige reiniciar o cliente e autorizar manual novamente; não existe
+reconexão serial automática. Roteiro: [CONTROLE_MANUAL_MOTORES.md](docs/CONTROLE_MANUAL_MOTORES.md).
+
 ## 3. Arquitetura-alvo de software
 
 ```mermaid
@@ -149,7 +173,7 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [x] Executar suíte local e suíte isolada da Pi no Mac; registrar **135 aprovados / 9 ignorados** e **21 OK**, respectivamente.
 - [x] Executar integração com broker/Node-RED reais e simulador, sem Docker: **9 aprovados**, incluindo controle manual e destino braço/rodas.
 - [x] Instalar o checkout e as dependências em uma .venv da Pi 3 real e reproduzir os **21 testes unitários em Python 3.13/ARM64**; registrar versões e SHA (seção 2.2).
-- [!] Configurar toolchains/placas e compilar os firmwares Mega e ArbotiX; registrar versões Arduino e bibliotecas utilizadas.
+- [-] Configurar toolchains/placas e compilar os firmwares Mega e ArbotiX; novo firmware de tração Mega compilado na seção 2.4; variantes históricas e ArbotiX continuam pendentes.
 - [-] Mapear cada função relatada a arquivo, classe, testes e evidência; identificar código morto/duplicado e documentação antiga/ZIP histórico.
 - [x] Identificar a sobreposição dos clientes `rover`/`roboticrover_pi3` e o ZIP/backup históricos; registrar a matriz de evidências local. A auditoria das fontes acadêmicas e a cobertura de firmware permanecem pendentes.
 - **Aceite:** matriz requisito → implementação → teste → status, sem chamar relato de prova independente.
@@ -166,26 +190,27 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [x] Remover `proximity_cm`, radar e dados de distância dedicados dos contratos, clientes, dashboard e artefatos históricos; manter bateria/temperatura e rejeitar o campo antigo no schema.
 - **Aceite:** testes de transição, contrato cruzado, mensagens vencidas/retained/duplicadas e permissões de modo para real e simulado.
 
-**[ ] R2. Protocolo USB serial Pi↔Mega**
-- [ ] Escolher framing robusto (ex.: COBS + delimitador ou comprimento + delimitador), versão, tipo, sequência/ID, comprimento máximo e CRC-16; especificar endianness, unidades, serial baud e recuperação após corrupção.
-- [ ] Mensagens mínimas: `HELLO/CAPS`, `ARM/DISARM`, `SET_WHEEL_SPEED` ou `SET_TWIST`, `STOP`, `SET_JOINT_TARGET`, `GET_TELEMETRY`, `STATUS`, `ACK/NACK`, `FAULT`, `HEARTBEAT`.
-- [ ] Estabelecer limites numéricos e rejeição de comandos não finitos, fora da faixa, não autorizados, repetidos ou expirados; sequence IDs após reboot para evitar associação incorreta.
-- [ ] Definir timeout de comando de movimento, heartbeat, estado seguro, política de rearme e timeouts por tipo de comando; **valores devem ser medidos/definidos em testes, não inventados**.
-- [ ] Incluir simulador/loopback do protocolo e testes com mensagens truncadas, CRC inválido, ruído e reconexão. Cuidar do reset do Mega quando USB é reaberto.
+**[-] R2. Protocolo USB serial Pi↔Mega**
+- [x] Implementar e reproduzir framing RR1 ASCII/LF limitado a 128 bytes, sessão, sequência, CRC-16, unidades PWM/TTL e USB 115200/8N1; parser incremental, rejeição e recuperação de corrupção testados em C++.
+- [-] Implementadas HELLO/ARM/DISARM/WHEELS/STOP/ACK/NACK para PWM de bancada. CAPS, velocidades calibradas, juntas, telemetria física e FAULT/HEARTBEAT seriais continuam pendentes.
+- [-] Limites de PWM/TTL, sessão/sequência, autorização e rejeição de movimento atrasado implementados na tração; valores não finitos não cabem no framing inteiro. Juntas e cobertura do reboot físico permanecem pendentes.
+- [-] TTL local, estado seguro, ARM e timeout por ACK implementados com valores provisórios de bancada. Falta medir no hardware; não tratar 300 ms de TTL como tempo de parada mecânica.
+- [-] Mega virtual usa o núcleo real C++ e o sketch inteiro instrumentado: CRC, truncamento, ruído, sequência, sessão, rollover e perda de USB verificados; reconexão automática/ensaio do reset físico pendentes.
 - **Aceite:** comando→ACK→telemetria com IDs corretos; corrupção e silêncio levam ao estado seguro.
 
-**[ ] R3. Firmware Mega seguro (primeiro testes SEM rodas livres no solo)**
-- [ ] Inicialização com habilitação de motores desligada; separar FSM de segurança local e parser serial não bloqueante.
-- [ ] Implementar watchdog independente da Pi e parada da tração em expiração; rearme deliberado, não somente reconexão.
-- [ ] Priorizar STOP e falhas sobre comandos normais, sem enfileiramento que reproduza movimento antigo.
-- [ ] Proteger contra limites de PWM, inversões bruscas, comandos a servos fora da faixa, tensão crítica e falhas de enlace.
+**[-] R3. Firmware Mega seguro (primeiro testes SEM rodas livres no solo)**
+- [x] Software inicia desarmado com saídas zero; FSM de segurança e parser não bloqueante separados e reproduzidos no sketch instrumentado. Energização física ainda não ensaiada.
+- [x] Watchdog de referências no Mega e ARM após expiração implementados/testados em C++; reconexão MQTT não retoma movimento. Prazo de parada física continua sem medição.
+- [-] STOP/DISARM válido zera saídas mesmo em sessão antiga; movimento MQTT tem validade curta. Parser não bloqueante e expiração testados; priorização/tempos elétricos e HIL continuam pendentes.
+- [-] Limites de PWM, zero antes de inversão, pausa provisória e falhas de enlace implementados. Servos, tensão crítica e validação sob carga pendentes.
 - [ ] Comandar parada física/de potência por hardware quando aplicável; **software não substitui chave de emergência física**.
 - [ ] Projetar política de servos em falha (manter torque versus relaxar) só após análise de risco de queda da carga.
 - **Aceite:** energizar não move; cortar Pi/MQTT/serial faz cessar comando motor dentro do limite validado; falhas não rearma automaticamente.
 
 ### P1 — Tração e robô remotamente controlável
 
-**[ ] R4. Driver dos NXT e encoders**
+**[-] R4. Driver dos NXT e encoders**
+- [x] Implementar dois canais de PWM em malha aberta e perfis DRV8833/L298N no Mega; verificar pinagem lógica e saídas zeradas em teste instrumentado e compilar para Mega. Não confirma o módulo/fiação reais.
 - [!] Confirmar pinagem NXT, tensão/corrente e tipo de ponte H efetivamente usados; implementar os dois canais de direção/PWM e estado de frenagem/costa conforme driver real.
 - [!] Leitura interrupt-driven dos encoders A/B, contagem com sinal, leitura atômica e monitoramento de pulsos inválidos; calibrar CPR efetivo no eixo de roda e relação de redução.
 - [ ] Implementar estimador de velocidade de cada roda e parâmetros mensuráveis `r` (raio) e `b` (bitola); converter `(v, omega)` em velocidades de roda respeitando saturações.
@@ -193,11 +218,11 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [!] Medir parada e curvas sob piso/carga/bateria; evitar assumir que PWMs iguais produzem trajetórias retas.
 - **Aceite:** avançar, recuar, girar e parar, ler encoders e manter velocidades testadas; comandos cortados provocam parada local.
 
-**[ ] R5. Ponte Raspberry Pi para hardware real**
-- [ ] Supervisionar `/dev/serial/by-id/...`/porta identificada por USB, reconectar com backoff, handshake `HELLO`, detectar reboot e sincronizar sequência.
-- [ ] Traduzir somente comandos permitidos pela FSM para referências do Mega; separar envio, ACK do Mega, telemetria real e conclusão de comando.
-- [ ] Publicar falhas de USB, comando recusado, heartbeat, motor e servo na árvore MQTT canônica; nunca publicar `executed` sem feedback.
-- [ ] Implementar fila de comandos por prioridade sem acumular comandos contínuos obsoletos; shutdown limpo e STOP.
+**[-] R5. Ponte Raspberry Pi para hardware real**
+- [-] Porta explícita, reset inicial, HELLO, sessão/sequência e acesso exclusivo implementados; falhas fecham/latcham o enlace. Backoff/reconexão automática e reboot físico pendentes.
+- [x] Traduzir somente tração autorizada pela FSM e distinguir `simulated_only/not_dispatched/mega_accepted/failed`; percurso API → MQTT real → Pi → Mega virtual reproduzido. Sem afirmar conclusão física.
+- [-] Falhas USB/CRC/timeout/NACK, perda de heartbeat e parada geram estado seguro/alarme. Motor/servo reais e telemetria física continuam pendentes.
+- [-] Ponte envia uma referência por vez, limita validade pela emissão MQTT, descarta direções antigas e pede DISARM no shutdown. Fila por prioridade e reconexão supervisionada continuam pendentes.
 - **Aceite:** dashboard→MQTT→Pi→Mega→tração e Mega→Pi→dashboard funcionam com registros correlacionados.
 
 **[-] R6. Teleoperação de rodas e segurança da UI**
@@ -210,7 +235,8 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 - [x] Adicionar alternador Pilotar Rover/Controlar braço no canto superior direito, parar antes da troca e identificar o destino na mensagem; disponibilizar cliques, WASD e setas, com instruções em popup ⓘ no canto superior esquerdo.
 - [x] Unificar estados, ACKs, conexões, avisos e erros em log com cores, filtros e popup de detalhes; conservar até 200 eventos em memória no Node-RED.
 - [x] Mover gráficos de bateria/temperatura para popup sob demanda, com indicação de dados simulados e sem leituras de proximidade.
-- [ ] Validar limites de velocidade e parada no hardware; completar dead-man/hold-to-run e intertravamentos físicos. Os comandos atuais são pulsos simulados de 500 ms, não controle físico contínuo.
+- [x] Implementar e testar no Chrome segurar/soltar por WASD/setas/ponteiro, renovação limitada e cancelamento por perda de foco, popup e retorno ao automático. Pi/Mega não renovam movimento sem novo comando MQTT.
+- [!] Validar velocidades, prazos e parada mecânica no hardware, incluindo intertravamentos físicos; PWM 80/TTL 300 ms e pausa 50 ms ainda são parâmetros provisórios de bancada.
 - **Aceite:** interface respeita travas e interrupção; mensagens de movimento não sobrevivem à perda do operador.
 
 ### P2 — Braço, câmera e percepção real

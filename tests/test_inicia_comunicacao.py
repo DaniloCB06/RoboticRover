@@ -41,6 +41,22 @@ def test_competition_mode_selects_official_client_and_mqtt_bridge():
     assert CONFIG["COMPETITION_PASSWORD"] not in str(local + remote)
 
 
+def test_physical_motor_mode_requires_explicit_port_before_any_connection():
+    result = subprocess.run([str(launcher.PYTHON), str(launcher.ROOT / "inicia_comunicacao.py"),
+                             "--mode", "1", "--motor-backend", "serial", "--dry-run"],
+                            capture_output=True, text=True, timeout=5)
+    assert result.returncode != 0
+    assert "MOTOR_SERIAL_PORT" in result.stderr
+
+
+def test_motor_dry_run_works_without_hardware_or_pyserial_import():
+    result = subprocess.run([str(launcher.PYTHON), str(launcher.ROOT / "inicia_comunicacao.py"),
+                             "--mode", "1", "--motor-backend", "serial", "--serial-port", "/dev/test-mega",
+                             "--dry-run"], capture_output=True, text=True, timeout=5)
+    assert result.returncode == 0, result.stderr
+    assert "Tração: serial" in result.stdout
+
+
 def await_line(process, timeout=5):
     assert select.select([process.stdout], [], [], timeout)[0], "Supervisor não respondeu"
     return json.loads(process.stdout.readline())

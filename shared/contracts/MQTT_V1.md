@@ -30,12 +30,13 @@ Envelope de todas as mensagens:
 
 - `simulated:false` no status significa **disponibilidade efetiva do cliente Linux**; não significa que o Arduino ou os sensores estão conectados.
 - `simulated:true` para ACK/estado indica validação **somente em software**, sem atuação física.
-- `command_id` deve ser UUID, `expires_at` é ISO8601 com timezone e TTL ≤ 10 s; a estação já emite TTL de 5 s.
+- `command_id` deve ser UUID, `expires_at` é ISO8601 com timezone e TTL ≤ 10 s; a estação emite 5 s para modos/PARAR e até 500 ms para direções, evitando reproduzir movimento atrasado.
 - Mensagens maiores que 4096 bytes, com timestamps antigos/futuros, comandos duplicados ou retained são ignorados/rejeitados.
 - `station/heartbeat`: `data.online=true` e `data.session_id` obrigatório. Espera em até 4 segundos de ausência de heartbeat.
-- O `PARAR` atualmente publicado em `rover/cmd/manual` ou `SEGURO_ESPERA` em `rover/cmd/modo` leva à espera segura simulada de qualquer estado.
+- O `PARAR` em `rover/cmd/manual` ou `SEGURO_ESPERA` em `rover/cmd/modo` leva à espera segura de qualquer estado; no backend serial opt-in, também exige ACK do desarme do Mega.
 - `state.data.manual_enabled` informa a autorização manual. Ela é concedida ao concluir aproximação (`AGUARDANDO_PEGA`) ou por `PARAR` com `take_control:true`, desde que o heartbeat seja válido. BUSCA, falhas e reconexão revogam a autorização; parada comum não cria autorização inicial.
-- Comandos manuais aceitam `target:"rover"` (padrão) ou `target:"manipulator"`. O braço usa `SUBIR`/`DESCER`/`ESQUERDA`/`DIREITA`/`PARAR`; as rodas usam `AVANCAR`/`RECUAR`/`ESQUERDA`/`DIREITA`/`PARAR`. Estado e ACK identificam `control_target`. Tudo permanece sem atuação física.
+- Comandos manuais aceitam `target:"rover"` (padrão) ou `target:"manipulator"`. O braço usa `SUBIR`/`DESCER`/`ESQUERDA`/`DIREITA`/`PARAR`; as rodas usam `AVANCAR`/`RECUAR`/`ESQUERDA`/`DIREITA`/`PARAR`. Estado e ACK identificam `control_target`. Por padrão não há atuação física; a ponte USB opt-in atua apenas na tração e rejeita movimentos do braço.
+- No cliente Pi, `execution` distingue `simulated_only`, `not_dispatched`, `mega_accepted` e `failed`. `mega_accepted` é referência aceita pelo firmware, nunca confirmação de movimento medido. `motor_backend` no estado/status e `hardware_actuation` no estado identificam o backend habilitado. Roteiro: [CONTROLE_MANUAL_MOTORES.md](../../docs/CONTROLE_MANUAL_MOTORES.md).
 - ACK documentado:
 
 ```json

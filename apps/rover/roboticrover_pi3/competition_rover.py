@@ -29,7 +29,7 @@ PHASES = {"SEGURO_ESPERA": "IDLE", "BUSCA": "BUSCA", "APROXIMACAO": "BUSCA_ARTEF
 class CompetitionRover(RoverMqtt):
     poll_interval = 0.025
 
-    def __init__(self, arena, telemetry_dir, *, mock_battery=False):
+    def __init__(self, arena, telemetry_dir, *, mock_battery=False, motors=None):
         self.arena = arena
         self.telemetry_dir = Path(telemetry_dir)
         self.mock_battery = mock_battery
@@ -46,7 +46,7 @@ class CompetitionRover(RoverMqtt):
         self.detections = OrderedDict()
         self.last_wire_ts = {}
         self.internal_commands = {arena.topic("cmd/rr/" + suffix): topic for topic, suffix in COMMANDS.items()}
-        super().__init__(Config(arena.host, arena.port, f"{arena.team}-robot", arena.team, arena.password, 5, False))
+        super().__init__(Config(arena.host, arena.port, f"{arena.team}-robot", arena.team, arena.password, 5, False), motors=motors)
         self._client.max_queued_messages_set(32)
 
     def _configure_will(self):
@@ -158,6 +158,16 @@ class CompetitionRover(RoverMqtt):
 
     def _reference_command(self, kind, value, age):
         rover = self.controller
+        if self.motors is not None:
+            # Nesta entrega física, somente o caminho validado pela FSM da
+            # dashboard pode mover rodas. Comandos diretos da arena não o contornam.
+            self._stop_motors()
+            rover.state, rover.manual_authorized = "SEGURO_ESPERA", False
+            self.reference_manual = False
+            if kind != "stop":
+                LOG.warning("Controle direto da arena não habilitado no backend serial: %s", kind)
+            self._publish("rover/estado", "state", {"state": rover.state, "reason": "arena_reference_no_actuation"}, simulated=False)
+            return
         if kind == "stop":
             self._stop_drive()
             rover.state, rover.manual_authorized = "SEGURO_ESPERA", False
@@ -275,6 +285,7 @@ class CompetitionRover(RoverMqtt):
         self._changed("mission", {"tags": [{"id": ident, "status": status} for ident, status in sorted(clean.items())]})
 
     def _tick(self, current):
+        super()._tick(current)
         if self.velocity_until and (current >= self.velocity_until or self.controller.state != "CAPTURA_MANUAL"):
             self._stop_drive()
         if self.controller.state == "SEGURO_ESPERA" and not self.controller.manual_authorized:
