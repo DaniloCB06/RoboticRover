@@ -1,3 +1,17 @@
+INICIALIZAÇÃO AUTOMÁTICA — executada no Mac, na raiz do projeto:
+.venv/bin/python inicia_comunicacao.py
+
+Escolha 1 para comunicação local ou 2 para servidor do professor
+acessível pela rede local, mesmo sem internet.
+Se precisar informar o endereço da Pi:
+.venv/bin/python inicia_comunicacao.py --pi puc@192.168.1.113
+
+Digite a senha SSH quando solicitada. Não precisa abrir terminais
+extras: o programa gerencia os processos do Mac e da Pi.
+Pressione Ctrl+C para encerrar os processos iniciados pelo programa.
+Pare as execuções manuais anteriores antes de usar o iniciador.
+Guia: docs/INICIA_COMUNICACAO.md
+
 ============================================================
 Mosquitto:
  cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
@@ -44,4 +58,132 @@ ssh -S /private/tmp/roboticrover-pi3.sock puc@192.168.1.113
 cd /home/puc/RoboticRover/apps/rover
 .venv/bin/python -m roboticrover_pi3.camera
 ============================================================
+
+============================================================
+COMPETIÇÃO ROVER04 — estação-base e Raspberry Pi 3
+
+Rede da arena: servidor do professor 192.168.50.3, Mac 192.168.50.130,
+Pi 3 do Rover 192.168.50.149 (puc.local). Atualize os IPs do Mac e da
+Pi se mudarem. Use os terminais abaixo em vez do simulador local e
+do túnel reverso MQTT.
+
+MAC — terminais 1 a 4, na raiz do projeto:
+cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
+
+1. Broker local da dashboard:
+.venv/bin/mosquitto -c infra/mqtt/mosquitto.local.conf
+
+2. Node-RED e dashboard:
+NODE_RED_HOST=127.0.0.1 COMPETITION_ARENA_URL=http://192.168.50.3:8080/arena.html \
+  ROVER_CAMERA_PROTOCOL=whep ROVER_CAMERA_URL=http://127.0.0.1:8890/rover/rover04/whep node-red \
+  --userDir .runtime/pi3-bootstrap/node-red \
+  --settings apps/station/node-red/settings.js \
+  "$PWD/apps/station/node-red/flows.json"
+
+3. Ponte MQTT da estação para o broker do professor:
+.venv/bin/python -m roboticrover_pi3.competition_station
+
+4. Estação WebRTC: recebe WHIP da Pi, serve WHEP local e faz forwarding WHIP:
+.venv/bin/python -m roboticrover_pi3.competition_forward --host 192.168.50.130
+Requer MediaMTX v1.21.4 em .runtime/mediamtx-v1.21.4/mediamtx (já instalado neste Mac).
+Deixe esse processo rodando. Não execute o relé TCP anterior em paralelo.
+Se já estiver ativo em segundo plano, não inicie outra cópia.
+Log da estação WebRTC desta sessão: .runtime/competition-forward.log
+
+5. No Mac, abra uma sessão SSH com o túnel usado pelo vídeo da dashboard:
+ssh -M -S /private/tmp/roboticrover-arena.sock \
+  -o ExitOnForwardFailure=yes \
+  -L 127.0.0.1:8081:127.0.0.1:8080 puc@192.168.50.149
+
+No prompt da Pi, nesse mesmo terminal, inicie o agente MQTT do Rover:
+cd /home/puc/RoboticRover
+apps/rover/.venv/bin/python -m roboticrover_pi3.competition_rover
+
+6. Em outro terminal do Mac, abra outra sessão SSH:
+ssh -S /private/tmp/roboticrover-arena.sock puc@192.168.50.149
+
+No prompt da Pi, inicie a webcam. O envio H.264 é somente para loopback da Pi:
+cd /home/puc/RoboticRover
+apps/rover/.venv/bin/python -m roboticrover_pi3.camera --relay-host 127.0.0.1 \
+  --relay-port 5002 --relay-transport udp --fps 15 --preview-fps 1
+Se a câmera já estiver ativa, não inicie outra cópia.
+Log da sessão na Pi: .runtime/camera-live.log
+
+7. Em mais um terminal SSH da Pi, publique via WebRTC/WHIP na estação:
+cd /home/puc/RoboticRover
+apps/rover/.venv/bin/python -m roboticrover_pi3.competition_video \
+  --listen-host 127.0.0.1 --listen-port 5002 --transport udp --basic \
+  --destination http://192.168.50.130:8890/rover/rover04/whip
+Requer: apps/rover/.venv/bin/python -m pip install 'aiortc==1.16.0'
+O receptor e o H.264 usam a mesma máquina; o Wi-Fi transporta WebRTC.
+
+Deixe todos os terminais abertos e acesse http://127.0.0.1:1880/dashboard.
+No servidor, o vídeo está em http://192.168.50.3:8080/arena.html?path=rover/rover04.
+POV WebRTC local, independente do servidor do professor:
+http://127.0.0.1:8890/rover/rover04
+Se houver uma preferência antiga salva na dashboard, selecione WebRTC/WHEP
+na engrenagem da câmera e use http://127.0.0.1:8890/rover/rover04/whep.
+Para conferir o produtor da prévia no Mac:
+curl --max-time 3 http://127.0.0.1:8081/health
+============================================================
+
+WEBRTC LOCAL NA LabIoT — instalação concluída em 19/11/2026
+Mac: 192.168.1.36. Pi: 192.168.1.113.
+Os processos do Mac foram encerrados. Pare os processos antigos da Pi
+antes de iniciar a sequência abaixo; mantenha cada terminal aberto.
+
+MAC — nos três primeiros terminais, entre na raiz:
+cd /Users/danilobarbosa/Desktop/Codes/RoboticRover
+
+1. MAC — Mosquitto local:
+.venv/bin/mosquitto -c infra/mqtt/mosquitto.local.conf
+
+2. MAC — Node-RED e dashboard com WebRTC:
+NODE_RED_HOST=127.0.0.1 ROVER_CAMERA_PROTOCOL=whep \
+  ROVER_CAMERA_URL=http://127.0.0.1:8890/rover/rover04/whep node-red \
+  --userDir .runtime/pi3-bootstrap/node-red \
+  --settings apps/station/node-red/settings.js \
+  "$PWD/apps/station/node-red/flows.json"
+
+3. MAC — estação WebRTC:
+.venv/bin/python -m roboticrover_pi3.competition_forward --host 192.168.1.36
+
+4. MAC — SSH com túnel MQTT reverso, em outro terminal:
+ssh -o ControlMaster=yes -o ControlPath=/private/tmp/roboticrover-run.sock \
+  -o ExitOnForwardFailure=yes \
+  -R 127.0.0.1:18883:127.0.0.1:1883 puc@192.168.1.113
+
+Depois de entrar na PI, nesse mesmo terminal — Rover de teste local:
+cd /home/puc/RoboticRover/apps/rover
+MQTT_HOST=127.0.0.1 MQTT_PORT=18883 .venv/bin/python -m roboticrover_pi3
+
+5. MAC — outro terminal SSH:
+ssh -S /private/tmp/roboticrover-run.sock puc@192.168.1.113
+
+Depois de entrar na PI — captura:
+cd /home/puc/RoboticRover
+apps/rover/.venv/bin/python -m roboticrover_pi3.camera --relay-host 127.0.0.1 \
+  --relay-port 5002 --relay-transport udp --fps 15 --preview-fps 1
+
+6. MAC — outro terminal SSH:
+ssh -S /private/tmp/roboticrover-run.sock puc@192.168.1.113
+
+Depois de entrar na PI — publicador WebRTC:
+cd /home/puc/RoboticRover
+apps/rover/.venv/bin/python -m roboticrover_pi3.competition_video \
+  --listen-host 127.0.0.1 --listen-port 5002 --transport udp --basic \
+  --destination http://192.168.1.36:8890/rover/rover04/whip
+
+Ver no Mac: http://127.0.0.1:8890/rover/rover04
+Dashboard: http://127.0.0.1:1880/dashboard
+Configuração na engrenagem: WebRTC/WHEP, URL
+http://127.0.0.1:8890/rover/rover04/whep
+O servidor 192.168.50.3 depende da rede da arena; ele pode ficar
+indisponível na LabIoT enquanto o vídeo local continua funcionando.
+Este modo local usa o cliente MQTT original na Pi. Para os tópicos
+oficiais do professor, use a seção COMPETIÇÃO ROVER04, com o agente
+competition_rover e a ponte competition_station. Execute um modo
+por vez; não inicie os dois agentes de Rover juntos.
+Logs na Pi: .runtime/webrtc-camera.log e .runtime/webrtc-publisher.log
+Log no Mac: .runtime/competition-forward.log
 

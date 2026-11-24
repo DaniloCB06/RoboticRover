@@ -11,6 +11,8 @@ dependencies = ["paho-mqtt==2.1.0", "jsonschema==4.23.0", "rfc3339-validator==0.
 
 [project.optional-dependencies]
 dev = ["pytest==8.3.5", "PyYAML==6.0.2", "websocket-client==1.8.0"]
+competition-video = ["aiortc>=1.10,<2"]
+competition-vision = ["ultralytics>=8,<9"]
 
 [project.scripts]
 rover-sim = "rover.__main__:main"

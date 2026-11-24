@@ -111,12 +111,41 @@ class FrameStore:
             return self.sequence, self.jpeg, self.received_utc
 
 
+def competition_output(host, port, fps, transport="udp"):
+    from .competition import host_address
+
+    encoder = ["-map", "0:v:0", "-an", "-vf", f"fps={fps}",
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
+            "-profile:v", "baseline", "-level:v", "3.1", "-pix_fmt", "yuv420p", "-threads", "1",
+            "-bf", "0", "-g", str(fps), "-b:v", "650k", "-maxrate", "800k", "-bufsize", "180k",
+            "-x264-params", f"keyint={fps}:min-keyint={fps}:scenecut=0:slices=1:repeat-headers=1"]
+    destination = f"{host_address(host)}:{port}"
+    if transport == "tcp":
+        return encoder + ["-f", "fifo", "-fifo_format", "mpegts", "-format_opts", "flush_packets=1",
+                          "-queue_size", str(max(4, fps // 2)), "-drop_pkts_on_overflow", "1",
+                          "-attempt_recovery", "1", "-recover_any_error", "1", "-recovery_wait_time", "1",
+                          "-restart_with_keyframe", "1",
+                          f"tcp://{destination}?tcp_nodelay=1&send_buffer_size=16384&timeout=3000000"]
+    return encoder + [
+            "-f", "mpegts", "-muxdelay", "0", "-flush_packets", "1",
+            f"udp://{destination}?pkt_size=1316"]
+
+
 def ffmpeg_command(args):
-    return [args.ffmpeg, "-hide_banner", "-loglevel", "warning", "-nostdin",
-            "-f", "v4l2", "-input_format", args.input_format,
-            "-video_size", f"{args.width}x{args.height}", "-framerate", str(args.fps),
-            "-i", args.device, "-an", "-filter_threads", "1", "-threads", "1",
-            "-c:v", "mjpeg", "-q:v", str(args.quality), "-f", "image2pipe", "pipe:1"]
+    preview_fps = args.preview_fps
+    if args.relay_host and preview_fps is None:
+        preview_fps = min(args.fps, 8)
+    command = [args.ffmpeg, "-hide_banner", "-loglevel", "warning", "-nostdin",
+            "-fflags", "+discardcorrupt", "-f", "v4l2", "-input_format", args.input_format,
+            "-video_size", f"{args.width}x{args.height}", "-framerate", str(args.fps), "-i", args.device,
+            "-filter_threads", "1", "-map", "0:v:0", "-an", "-threads", "1"]
+    if preview_fps:
+        command.extend(["-vf", f"fps={preview_fps}"])
+    quality = max(args.quality, 10) if args.relay_host else args.quality
+    command.extend(["-c:v", "mjpeg", "-q:v", str(quality), "-f", "image2pipe", "pipe:1"])
+    if getattr(args, "relay_host", None):
+        command.extend(competition_output(args.relay_host, args.relay_port, args.fps, args.relay_transport))
+    return command
 
 
 class Capture:
@@ -235,7 +264,9 @@ class CameraHandler(BaseHTTPRequestHandler):
         frames = self.server.frames
         if route == "/health":
             status = dict(frames.status(), width=self.server.args.width, height=self.server.args.height,
-                          requested_fps=self.server.args.fps)
+                          requested_fps=(getattr(self.server.args, "preview_fps", None) or
+                                         (min(self.server.args.fps, 8) if getattr(self.server.args, "relay_host", None)
+                                          else self.server.args.fps)))
             body = json.dumps(status).encode()
             self.respond(200 if status["online"] else 503, "application/json", len(body))
             self.end_headers()
@@ -289,6 +320,10 @@ def build_parser():
     parser.add_argument("--quality", type=int, default=5)
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--input-format", default="yuyv422", choices=("yuyv422", "mjpeg"))
+    parser.add_argument("--relay-host", help="IP da estação-base para vídeo H.264/MPEG-TS")
+    parser.add_argument("--relay-port", type=int, default=5000)
+    parser.add_argument("--relay-transport", choices=("tcp", "udp"), default="udp")
+    parser.add_argument("--preview-fps", type=int, help="Limita só o MJPEG da dashboard")
     parser.add_argument("--allowed-origin", action="append", default=["http://127.0.0.1:1880", "http://localhost:1880"])
     return parser
 
@@ -299,6 +334,15 @@ def main():
     if not (1 <= args.port <= 65535 and 1 <= args.fps <= 30 and 1 <= args.quality <= 31
             and 1 <= args.width <= 1920 and 1 <= args.height <= 1080):
         parser.error("Invalid port, frame rate, quality or frame size")
+    if args.relay_host:
+        if (args.width, args.height) != (640, 480) or not 1 <= args.relay_port <= 65535:
+            parser.error("O relé requer 640x480 e uma porta UDP válida")
+        try:
+            competition_output(args.relay_host, args.relay_port, args.fps, args.relay_transport)
+        except ValueError as exc:
+            parser.error(str(exc))
+    if args.preview_fps is not None and not 1 <= args.preview_fps <= args.fps:
+        parser.error("O FPS do preview deve estar entre 1 e o FPS de captura")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     frames = FrameStore()
     capture = Capture(args, frames)

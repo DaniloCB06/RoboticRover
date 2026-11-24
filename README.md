@@ -1,6 +1,6 @@
 # RoboticRover
 
-Infraestrutura de comunicação MQTT, Simulador da Raspberry Pi 3 e **Dashboard do Operador** entre o Rover e a estação-base. **Todos os dados, sensores, falhas e movimentos desta versão são simulados (`simulated: true`). Nenhum código aciona hardware físico.**
+Infraestrutura MQTT, cliente da Raspberry Pi 3 e **Dashboard do Operador**. O vídeo pode vir da webcam real; os comandos de tração e braço no cliente Python continuam em simulação, sem atuar no hardware.
 
 A estação-base utiliza **Mosquitto** (broker MQTT v5) e **Node-RED** (fluxos MQTT + servidor da Dashboard em <http://127.0.0.1:1880/dashboard>), com duas visões de câmera configuráveis por **WebRTC/WHEP**, player WebRTC ou **MJPEG sobre HTTP**.
 
@@ -9,6 +9,10 @@ Você pode executar o projeto de **duas formas** em **Windows, macOS ou Linux**:
 - **Opção 2 — Sem Docker (Nativo):** Mosquitto, Node-RED e o simulador Python rodam diretamente no sistema operacional.
 
 Para um roteiro adicional de laboratório, consulte também [TESTE_COMUNICACAO.md](TESTE_COMUNICACAO.md).
+
+Para o modo oficial `rover04` (MQTT da arena, câmera H.264 e relé WHIP), siga o [roteiro da competição](docs/COMPETICAO_ROVER04.md).
+
+Para iniciar os serviços do Mac e da Pi com um único comando, use `.venv/bin/python inicia_comunicacao.py` e escolha **1** (local) ou **2** (professor acessível pela rede). O servidor não precisa de internet. O roteiro completo, incluindo encerramento por Ctrl+C, está em [INICIA_COMUNICACAO.md](docs/INICIA_COMUNICACAO.md).
 
 ---
 

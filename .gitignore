@@ -10,3 +10,9 @@ dist/
 infra/mqtt/passwords
 infra/mqtt/certs/
 *.log
+.DS_Store
+*.backup
+*.bak
+*.swp
+*.swo
+RoboticRover_Pi3_MQTT_preparacao.zip

@@ -37,11 +37,27 @@ class RoverMqtt:
         )
         if config.username:
             self._client.username_pw_set(config.username, config.password)
-        self._client.will_set("rover/status", self._status(False), qos=1, retain=True)
+        self._configure_will()
         self._client.reconnect_delay_set(min_delay=1, max_delay=15)
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
+
+    def _configure_will(self):
+        self._client.will_set("rover/status", self._status(False), qos=1, retain=True)
+
+    def _topic(self, topic):
+        return topic
+
+    def _subscribe(self, client, options):
+        for topic in ("station/heartbeat", "rover/cmd/modo", "rover/cmd/manual"):
+            client.subscribe(topic, options=options)
+
+    def _tick(self, current):
+        pass
+
+    def _watchdog(self, current):
+        return self.controller.watchdog(at=current)
 
     def _status(self, online: bool) -> str:
         return envelope("status", {
@@ -59,7 +75,7 @@ class RoverMqtt:
                         control_target=self.controller.control_target)
         elif event_type == "ack":
             data = dict(data, control_target=self.controller.control_target)
-        info = self._client.publish(topic, envelope(event_type, data, simulated), qos=1, retain=retain)
+        info = self._client.publish(self._topic(topic), envelope(event_type, data, simulated), qos=1, retain=retain)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             LOG.warning("MQTT publish falhou: %s, rc=%s", topic, info.rc)
 
@@ -69,8 +85,7 @@ class RoverMqtt:
             return
         self._connected.set()
         options = SubscribeOptions(qos=1, retainAsPublished=True)
-        for topic in ("station/heartbeat", "rover/cmd/modo", "rover/cmd/manual"):
-            client.subscribe(topic, options=options)
+        self._subscribe(client, options)
         # MQTT é rede; restabelecer conexão não implica retomar movimento.
         with self._lock:
             self.controller.state = "SEGURO_ESPERA"
@@ -92,18 +107,21 @@ class RoverMqtt:
         LOG.warning("Desconectado do broker: %s", reason_code)
 
     def _on_message(self, client, userdata, msg):
+        self._handle_internal(msg.topic, msg.payload, msg.retain)
+
+    def _handle_internal(self, topic, payload, retained):
         # O broker da estação já aplica TTL MQTT5, mas validamos expires_at novamente.
-        if len(msg.payload) > MAX_PAYLOAD_BYTES:
-            LOG.warning("Payload excessivo: %s", msg.topic)
+        if len(payload) > MAX_PAYLOAD_BYTES:
+            LOG.warning("Payload excessivo: %s", topic)
             return
         try:
-            packet = read_packet(msg.topic, msg.payload)
+            packet = read_packet(topic, payload)
         except ValueError as exc:
-            LOG.warning("Mensagem ignorada em %s: %s", msg.topic, exc)
+            LOG.warning("Mensagem ignorada em %s: %s", topic, exc)
             return
         with self._lock:
-            if msg.retain:
-                LOG.warning("Mensagem de controle retained rejeitada: %s", msg.topic)
+            if retained:
+                LOG.warning("Mensagem de controle retained rejeitada: %s", topic)
                 return
             if packet.event_type == "heartbeat":
                 before = self.controller.state
@@ -123,6 +141,7 @@ class RoverMqtt:
                 "execution": decision.execution,
             }, simulated=True)
             if decision.accepted:
+                self._on_accepted(packet)
                 self._publish("rover/estado", "state", {
                     "state": decision.state,
                     "hardware_actuation": False,
@@ -136,6 +155,9 @@ class RoverMqtt:
                 "reason": decision.reason,
             }, simulated=True)
 
+    def _on_accepted(self, packet):
+        pass
+
     def run(self):
         LOG.info("Iniciando cliente MQTT (sem controle físico de motores)")
         self._client.connect_async(self.config.host, self.config.port, keepalive=10)
@@ -146,7 +168,7 @@ class RoverMqtt:
             while not self._stop.is_set():
                 current = time.monotonic()
                 with self._lock:
-                    if self.controller.watchdog(at=current):
+                    if self._watchdog(current):
                         self._publish("rover/estado", "state", {
                             "state": "SEGURO_ESPERA", "hardware_actuation": False,
                         }, simulated=True)
@@ -166,7 +188,8 @@ class RoverMqtt:
                             "note": "VALORES ARTIFICIAIS / SENSOR NÃO CONECTADO",
                         }, simulated=True)
                         last_mock = current
-                self._stop.wait(0.25)
+                    self._tick(current)
+                self._stop.wait(self.poll_interval)
         except KeyboardInterrupt:
             pass
         finally:
@@ -175,7 +198,7 @@ class RoverMqtt:
     def shutdown(self):
         self._stop.set()
         if self._connected.is_set():
-            info = self._client.publish("rover/status", self._status(False), qos=1, retain=True)
+            info = self._publish_offline()
             try:
                 info.wait_for_publish(timeout=2)
             except RuntimeError:
@@ -183,6 +206,11 @@ class RoverMqtt:
         self._client.disconnect()
         self._client.loop_stop()
         LOG.info("Cliente encerrado")
+
+    poll_interval = 0.25
+
+    def _publish_offline(self):
+        return self._client.publish(self._topic("rover/status"), self._status(False), qos=1, retain=True)
 
 
 def main():

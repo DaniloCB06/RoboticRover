@@ -46,7 +46,7 @@
 | Navegação autônoma | Busca, seleção, alinhamento, aproximação e parada antes da peça | Ausente do robô físico | **Ausente** | Missão autônoma repetível em arena de teste |
 | Captura manual | Autorizar após aproximação ou parada forçada; separar braço de tração | `manual_enabled` controlado no Rover; UI bloqueada no automático; alvo `manipulator` usa ações próprias e mantém `motion: PARAR`, comprovado em testes | **Fluxo de software parcial; sem juntas, garra ou captura real** | Operador captura com limites e feedback físicos |
 | Retorno/depósito | Pilotar até área segura após captura; depósito seguro; retorno autônomo opcional | Alternador permite selecionar tração durante sessão manual autorizada; estados finais, confirmação de peça e soltura ainda incompletos | **Pilotagem simulada disponível; missão física pendente** | Ciclo de resgate manual completo; bônus em fase avançada |
-| Servidor professor | Publicar imagens/resultados por interface futura | Não mencionado entre implementações | **Pendente contrato externo** | Adaptador com mocks; integração oficial quando requisitos recebidos |
+| Servidor professor | MQTT isolado em `rover/rover04/#`, estado da arena e vídeo WHIP | Contrato recebido; agente, ponte MQTT, vídeo H.264 e retransmissão WHIP implementados | **Parcial: homologação pendente** | Validar Pi, bateria real, vídeo e credenciais no servidor oficial |
 | Deploy/segurança | Reinício, autenticação, ACL, limites e logs | Dev local; TLS/systemd faltantes | **Parcial** | Execução reprodutível e watchdog independente |
 | Testes | Unidade + integração + HIL + arena | 135 locais, 9 MQTT reais, 21 Pi (subconjunto dos locais), QA Chrome desktop/mobile | **Suítes locais reproduzidas; HIL/arena ausentes** | CI, compilação firmware e injeção de falhas físicas |
 
@@ -258,7 +258,7 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 
 **[-] R11. Fluxo de captura, retorno e depósito**
 - [ ] Comandar garra/caçamba em `CAPTURA_MANUAL`, exigir declaração ou sensor confiável de peça presa; não presumir pelo botão de fechamento.
-- [-] Permitir `RETORNO_MANUAL` conforme regras, com câmera/controles seguros; determinar condição de entrada na zona e `DEPOSITO`, soltar sem empurrar objetos.
+- [-] Preparar retorno com câmera/controles seguros; o contrato exige navegação autônoma até a área de descarga. A pilotagem manual existente serve para testes e interrupção de segurança; em prova, pilotagem manual na navegação pode gerar penalidade.
 - [x] Disponibilizar a alternância braço→pilotagem→braço em uma sessão manual autorizada, com parada na troca e separação de destinos comprovada nos testes. A coleta, o transporte até a área segura e a soltura continuam pendentes no hardware.
 - [ ] Registrar início/fim de ciclo e falhas de captura, troca de ferramenta somente parado/ESPERA; cronômetro de 4 min na interface é assistivo e não substitui cronômetro oficial.
 - [ ] Implementar `RETORNO_AUTONOMO` **após ciclo manual funcional**, com localização da área verde, orientação/odometria e confirmação de entrada segura; retorno autônomo não autoriza captura automática.
@@ -267,11 +267,17 @@ Um subitem `[x]` de software/simulação não conclui o marco físico que o cont
 
 ### P4 — Consolidação, integração externa e entrega
 
-**[!] R12. Envio ao servidor do professor**
-- [!] Solicitar contrato oficial: URL, autenticação, payload, formato de imagem/dados, frequência, políticas de upload e permissões.
-- [ ] Criar adaptador assíncrono na estação-base com mocks enquanto contrato indisponível; uploads nunca bloqueiam controle ou inferência.
-- [ ] Implementar fila limitada, expiração, retry/backoff, observabilidade e descarte quando exceder a capacidade.
-- **Aceite:** contrato de integração homologado quando fornecido; quedas do servidor não interferem na movimentação segura do rover.
+**[-] R12. Envio ao servidor do professor**
+- [-] Preparar WebRTC Pi→estação e forwarding WHIP estação→professor sem recodificação; cadeia reproduzida com dois MediaMTX locais e vídeo sintético. Publicação real dessa nova cadeia no servidor oficial ainda depende da rede da arena; ver `docs/WEBRTC_FORWARD.md`.
+- [x] Instalar `aiortc`/`av` na Pi e validar a webcam real por WHIP→estação→WHEP no Mac: 151 quadros de 640×480 a 15,06 FPS, sem perda RTP reportada na janela de teste, e 29 testes da Pi aprovados.
+- [x] Registrar o contrato de MQTT, H.264 e WHIP para a equipe `rover04`.
+- [x] Implementar e reproduzir em laboratório os envios de `status`/Last Will, `state`, `mode`, `battery`, `detection`, `mission`, comandos e cópia local de `arena/state`, usando testes unitários e brokers locais.
+- [x] Reproduzir captura USB real na Pi com MJPEG local e H.264 640×480/15 FPS; entregar quadros pelo Wi-Fi ao relé WHIP do Mac e ao receptor de laboratório.
+- [x] Instalar e testar o agente de competição na Pi com a ponte MQTT do Mac: comando e ACK, status, bateria artificial e parada simulada por falta de renovação da velocidade.
+- [-] Adicionar Visão Arena na dashboard e validar acesso à página do servidor oficial.
+- [-] Limitar filas e TTL de controle, zerar velocidade simulada em perda de comandos e reconectar MQTT/WHIP.
+- [!] Homologar com a Pi, o IP/credencial oficial, a bateria medida, a associação das classes YOLO e testes de parada dos motores físicos.
+- **Aceite:** seguir o [roteiro de competição](docs/COMPETICAO_ROVER04.md) e reproduzir os critérios da seção 6 do contrato com o juiz.
 
 **[-] R13. Implantação, proteção e observabilidade**
 - [ ] Serviços `systemd` para Pi (serial, MQTT, vídeo, FSM) com healthcheck e reinício seguro; documentação de bootstrap de Pi 3 e acesso webcam/serial.

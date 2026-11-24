@@ -66,7 +66,7 @@ def read_packet(topic: str, payload: bytes, *, received_at: Optional[datetime] =
         raise ValueError("payload acima do tamanho permitido")
     try:
         obj = json.loads(payload.decode("utf-8"))
-    except (UnicodeError, ValueError) as exc:
+    except (ValueError, RecursionError) as exc:
         raise ValueError("JSON inválido") from exc
     if not isinstance(obj, dict):
         raise ValueError("envelope deve ser objeto JSON")
@@ -100,7 +100,7 @@ def read_packet(topic: str, payload: bytes, *, received_at: Optional[datetime] =
         if seconds <= 0 or seconds > 10:
             raise ValueError("comando expirado ou TTL excessivo")
         if topic == "rover/cmd/modo":
-            if data.get("mode") not in MODES:
+            if not isinstance(data.get("mode"), str) or data["mode"] not in MODES:
                 raise ValueError("modo desconhecido")
             if "operator_override" in data and not isinstance(data["operator_override"], bool):
                 raise ValueError("operator_override deve ser booleano")
@@ -109,7 +109,7 @@ def read_packet(topic: str, payload: bytes, *, received_at: Optional[datetime] =
                 raise ValueError("target inválido")
             if "take_control" in data and not isinstance(data["take_control"], bool):
                 raise ValueError("take_control deve ser booleano")
-            if data.get("action") not in MANUAL_ACTIONS:
+            if not isinstance(data.get("action"), str) or data["action"] not in MANUAL_ACTIONS:
                 raise ValueError("ação desconhecida")
             if isinstance(data.get("duration_ms"), bool) or not isinstance(data.get("duration_ms"), int) or not (0 < data["duration_ms"] <= 1000):
                 raise ValueError("duration_ms fora de faixa")
