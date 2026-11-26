@@ -1,0 +1,76 @@
+SEGUIDOR DE APRILTAG - COMO FUNCIONA E COMO TESTAR
+===================================================
+
+O QUE ELE FAZ (resumo)
+----------------------
+Arquivo: vision/seguidor_apriltag_pi3.py
+
+1. A webcam da Pi enxerga a AprilTag e mede onde ela esta:
+   x = quanto ela esta para o lado, z = quanto esta na frente.
+2. calcular_pwm(x, z) decide a forca dos dois motores (controle
+   proporcional): longe = anda mais rapido, torta = gira para alinhar.
+3. O rover PARA a 15 cm da tag (DIST_ALVO = 0.15) e avisa a maquina de
+   estados chamando approach_completed().
+   Resultado: estado APROXIMACAO -> AGUARDANDO_PEGA, e o operador ja
+   pode usar o braco na dashboard.
+4. O PWM vai por USB para o Arduino Mega no formato "esq,dir"
+   (ex: "120,120"). O Mega tem watchdog de 350 ms: se parar de receber
+   comando, os motores desligam sozinhos.
+
+TRAVAS DE SEGURANCA (ligadas a aproximacao do rover)
+----------------------------------------------------
+- So anda se o estado do rover for APROXIMACAO. Em ESPERA, BUSCA, etc.
+  o PWM e sempre 0,0.
+- Sem heartbeat da estacao ou com falha ativa: PWM 0,0.
+- Perdeu a tag por mais de 0,40 s: freia (0,0).
+
+MEDIDAS DO CHASSI (no topo do arquivo, mude la se precisar)
+-----------------------------------------------------------
+raio da roda 0.026 m | bitola 0.170 m | parada 0.15 m | timeout 0.40 s
+
+--------------------------------------------------------------------
+1) TESTAR SEM ROBO (so no computador, nao precisa de Pi nem camera)
+--------------------------------------------------------------------
+Na raiz do projeto:
+
+Mac/Linux:
+  .venv/bin/python -m pytest tests/test_vision_apriltag.py -v
+
+Windows (PowerShell):
+  .\.venv\Scripts\python.exe -m pytest tests/test_vision_apriltag.py -v
+
+Se a .venv nao existir ainda:
+  Mac/Linux: python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"
+  Windows:   py -m venv .venv ; .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+
+Resultado esperado: 7 passed (verde) no final.
+Cada teste tem nome em portugues dizendo o que confere, por exemplo
+"test_controle_para_a_15_cm_e_corrige_lado".
+
+Para rodar TODOS os testes do projeto:
+  .venv/bin/python -m pytest -q        (esperado: tudo passando)
+
+--------------------------------------------------------------------
+2) TESTAR O FIRMWARE NO MEGA (bancada, rodas no ar!)
+--------------------------------------------------------------------
+- Abra firmware/arduino-mega/controle_l298n_mega/controle_l298n_mega.ino
+  na Arduino IDE e envie para o Mega.
+- No Serial Monitor (115200, "Nova linha") digite:  120,120
+  -> os motores giram. Pare de enviar: em 350 ms eles desligam (watchdog).
+- Pinos 18 e 19 ficam livres para a ArbotiX-M.
+
+--------------------------------------------------------------------
+3) RODAR NA RASPBERRY PI (com camera e Mega ligados por USB)
+--------------------------------------------------------------------
+Dependencias (uma vez, na Pi):
+  apps/rover/.venv/bin/python -m pip install pyserial opencv-python pupil-apriltags
+
+Ajuste PORTA_SERIAL no topo do arquivo (ex: /dev/ttyACM0), depois:
+  cd /home/puc/RoboticRover
+  apps/rover/.venv/bin/python -m vision.seguidor_apriltag_pi3
+
+Ctrl+C para parar (envia 0,0 antes de sair).
+ATENCAO: na primeira vez, deixe as rodas no ar.
+Obs: rodando assim (sem o cliente MQTT), o seguidor anda sempre que ve
+a tag. A trava do estado APROXIMACAO vale quando ele e ligado ao
+controller do rover (SeguidorAprilTag(controller)).
